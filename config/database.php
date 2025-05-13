@@ -112,6 +112,19 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        'oracle' => [
+            'driver'        => 'oracle',
+            'tns'           => env('DB_TNS', ''),
+            'host'          => env('DB_HOST', '127.0.0.1'),
+            'port'          => env('DB_PORT', '1521'),
+            'database'      => env('DB_DATABASE', 'XE'),
+            'service_name'  => env('DB_SERVICE_NAME', ''),
+            'sid'           => env('DB_DATABASE', 'XE'),
+            'username'      => env('DB_USERNAME', 'C##PEMUSTAKAAWARD'),
+            'password'      => env('DB_PASSWORD', 'password'),
+            'charset'       => env('DB_CHARSET', 'AL32UTF8'),
+            'prefix'        => env('DB_PREFIX', ''),
+        ],
     ],
 
     /*
@@ -147,7 +160,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 

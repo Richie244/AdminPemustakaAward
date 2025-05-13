@@ -81,6 +81,7 @@
                             @endphp
 
                             @if($oldSesi)
+                                {{-- Populate with old input if validation failed --}}
                                 @foreach($oldSesi as $sesiIndex => $sesiData)
                                 <div class="p-4 bg-white border border-gray-300 rounded-lg shadow-sm sesi-item space-y-4" data-sesi-index="{{ $sesiIndex }}">
                                     <div class="flex justify-between items-center">
@@ -104,28 +105,33 @@
                                         </div>
                                     </div>
                                     <div class="mt-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi</label>
-                                        <select name="sesi[{{ $sesiIndex }}][pemateri_id]" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi {{ $loop->iteration }}</label>
+                                        @php
+                                            $oldPemateriId = $sesiData['id_pemateri'] ?? (isset($sesiData['pemateri_ids']) && is_array($sesiData['pemateri_ids']) && count($sesiData['pemateri_ids']) > 0 ? $sesiData['pemateri_ids'][0] : null);
+                                        @endphp
+                                        <select name="sesi[{{ $sesiIndex }}][id_pemateri]" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                                             <option value="">-- Pilih Pemateri --</option>
-                                            @foreach($masterPemateri as $pemateriMaster)
-                                                @php 
-                                                    $pemateriMasterId = $pemateriMaster->id_pemateri ?? $pemateriMaster->ID_PEMATERI ?? '';
-                                                    $selected = (string)($sesiData['pemateri_id'] ?? '') === (string)$pemateriMasterId;
-                                                @endphp
-                                                <option value="{{ $pemateriMasterId }}" {{ $selected ? 'selected' : '' }}>
-                                                    {{ $pemateriMaster->nama_pemateri ?? $pemateriMaster->NAMA_PEMATERI ?? 'Nama Tidak Tersedia' }}
-                                                </option>
-                                            @endforeach
+                                            @if(isset($masterPemateri) && $masterPemateri->isNotEmpty())
+                                                @foreach($masterPemateri as $pemateriMaster)
+                                                    @php $pemateriMasterId = $pemateriMaster->id_pemateri ?? $pemateriMaster->ID_PEMATERI ?? ''; @endphp
+                                                    <option value="{{ $pemateriMasterId }}" {{ (string)$oldPemateriId == (string)$pemateriMasterId ? 'selected' : '' }}>
+                                                        {{ $pemateriMaster->nama_pemateri ?? $pemateriMaster->NAMA_PEMATERI ?? 'Nama Tidak Tersedia' }}
+                                                    </option>
+                                                @endforeach
+                                            @else
+                                                <option value="" disabled>Tidak ada data master pemateri</option>
+                                            @endif
                                         </select>
                                     </div>
                                 </div>
                                 @endforeach
                             @elseif($jadwalKegiatan->isNotEmpty())
+                                {{-- Populate with existing data from database --}}
                                 @foreach($jadwalKegiatan as $sesiIndex => $jadwal)
                                 <div class="p-4 bg-white border border-gray-300 rounded-lg shadow-sm sesi-item space-y-4" data-sesi-index="{{ $sesiIndex }}">
                                     <div class="flex justify-between items-center">
                                         <h3 class="text-lg font-semibold text-gray-800">Sesi {{ $loop->iteration }}</h3>
-                                        <button type="button" title="Hapus Sesi Ini" class="remove-sesi flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition-colors">
+                                         <button type="button" title="Hapus Sesi Ini" class="remove-sesi flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition-colors">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                         </button>
                                     </div>
@@ -144,22 +150,28 @@
                                         </div>
                                     </div>
                                     <div class="mt-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi</label>
-                                        <select name="sesi[{{ $sesiIndex }}][pemateri_id]" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi {{ $loop->iteration }}</label>
+                                        @php
+                                            $currentJadwalPemateriId = $jadwal->id_pemateri ?? null;
+                                        @endphp
+                                        <select name="sesi[{{ $sesiIndex }}][id_pemateri]" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                                             <option value="">-- Pilih Pemateri --</option>
-                                            @foreach($masterPemateri as $pemateriMaster)
-                                                @php 
-                                                    $pemateriMasterId = $pemateriMaster->id_pemateri ?? $pemateriMaster->ID_PEMATERI ?? '';
-                                                    $selected = (string)($jadwal->pemateri_id ?? '') === (string)$pemateriMasterId;
-                                                @endphp
-                                                <option value="{{ $pemateriMasterId }}" {{ $selected ? 'selected' : '' }}>
-                                                    {{ $pemateriMaster->nama_pemateri ?? $pemateriMaster->NAMA_PEMATERI ?? 'Nama Tidak Tersedia' }}
-                                                </option>
-                                            @endforeach
+                                            @if(isset($masterPemateri) && $masterPemateri->isNotEmpty())
+                                                @foreach($masterPemateri as $pemateriMaster)
+                                                    @php $pemateriMasterId = $pemateriMaster->id_pemateri ?? $pemateriMaster->ID_PEMATERI ?? ''; @endphp
+                                                    <option value="{{ $pemateriMasterId }}" {{ (string)$currentJadwalPemateriId == (string)$pemateriMasterId ? 'selected' : '' }}>
+                                                        {{ $pemateriMaster->nama_pemateri ?? $pemateriMaster->NAMA_PEMATERI ?? 'Nama Tidak Tersedia' }}
+                                                    </option>
+                                                @endforeach
+                                            @else
+                                                <option value="" disabled>Tidak ada data master pemateri</option>
+                                            @endif
                                         </select>
                                     </div>
                                 </div>
                                 @endforeach
+                            @else
+                                {{-- Fallback: JS will add one empty session if no old input and no DB data --}}
                             @endif
                         </div>
                     </div>
@@ -170,13 +182,28 @@
                         <input type="file" id="template_sertifikat" name="template_sertifikat"
                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                                class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border border-gray-300 rounded-lg shadow-sm cursor-pointer">
-                        @if($kegiatan->template_sertifikat_file)
+                        @if($kegiatan->template_sertifikat_file && (property_exists($kegiatan->template_sertifikat_file, 'nama_file') || (is_array($kegiatan->template_sertifikat_file) && isset($kegiatan->template_sertifikat_file['nama_file'])) ) )
+                            @php
+                                $namaFileSertifikat = '';
+                                $pathFileSertifikat = '';
+                                if (is_object($kegiatan->template_sertifikat_file) && property_exists($kegiatan->template_sertifikat_file, 'nama_file')) {
+                                    $namaFileSertifikat = $kegiatan->template_sertifikat_file->nama_file;
+                                    $pathFileSertifikat = asset('storage/sertifikat_templates_kegiatan/' . $namaFileSertifikat);
+                                } elseif (is_array($kegiatan->template_sertifikat_file) && isset($kegiatan->template_sertifikat_file['nama_file'])) {
+                                    $namaFileSertifikat = $kegiatan->template_sertifikat_file['nama_file'];
+                                    $pathFileSertifikat = asset('storage/sertifikat_templates_kegiatan/' . $namaFileSertifikat);
+                                }
+                            @endphp
+                            @if($namaFileSertifikat)
                             <p class="mt-1 text-xs text-gray-500">File saat ini:
-                                <a href="{{ asset('storage/sertifikat_templates_kegiatan/' . $kegiatan->template_sertifikat_file) }}" target="_blank" class="text-blue-500 hover:underline">
-                                    {{ $kegiatan->template_sertifikat_file }}
+                                <a href="{{ $pathFileSertifikat }}" target="_blank" class="text-blue-500 hover:underline">
+                                    {{ $namaFileSertifikat }}
                                 </a>
                                 (Biarkan kosong jika tidak ingin mengubah)
                             </p>
+                            @else
+                             <p class="mt-1 text-xs text-gray-500">Belum ada template sertifikat. Format yang didukung: PDF, DOC, DOCX, JPG, PNG. Maksimal 2MB.</p>
+                            @endif
                         @else
                             <p class="mt-1 text-xs text-gray-500">Belum ada template sertifikat. Format yang didukung: PDF, DOC, DOCX, JPG, PNG. Maksimal 2MB.</p>
                         @endif
@@ -194,7 +221,7 @@
                     <div>
                         <label for="bobot_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Bobot Poin Keseluruhan Kegiatan</label>
                         <input type="number" id="bobot_kegiatan" name="bobot_kegiatan"
-                               value="{{ old('bobot_kegiatan', $kegiatan->bobot_kegiatan ?? ($kegiatan->BOBOT_KEGIATAN ?? '')) }}" required min="0"
+                               value="{{ old('bobot_kegiatan', $kegiatan->bobot_kegiatan ?? ($kegiatan->jadwal->first()->bobot_kegiatan ?? ($kegiatan->jadwal->first()->BOBOT_KEGIATAN ?? ($kegiatan->jadwal->first()->bobot ?? '') ) )) }}" required min="0"
                                placeholder="Masukkan bobot poin total" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                     </div>
 
@@ -219,42 +246,68 @@
 document.addEventListener('DOMContentLoaded', function() {
     const masterPemateriData = @json($masterPemateri ?? collect());
     const sesiContainer = document.getElementById('sesi-container');
-    let sesiCounter = 0;
 
     function getNextSesiIndex() {
         let maxIndex = -1;
         sesiContainer.querySelectorAll('.sesi-item').forEach(item => {
             const currentIndex = parseInt(item.dataset.sesiIndex, 10);
-            if (currentIndex > maxIndex) maxIndex = currentIndex;
+            if (!isNaN(currentIndex) && currentIndex > maxIndex) {
+                maxIndex = currentIndex;
+            }
         });
         return maxIndex + 1;
     }
 
-    function createPemateriSelectHtml(sesiIdx, selectedId = null) {
+    function createPemateriSelectHtml(sesiIdx, selectedPemateriId = null) {
         let optionsHtml = '<option value="">-- Pilih Pemateri --</option>';
-        masterPemateriData.forEach(pemateri => {
-            const id = pemateri.id_pemateri || pemateri.ID_PEMATERI;
-            const nama = pemateri.nama_pemateri || pemateri.NAMA_PEMATERI;
-            const selected = selectedId == id ? 'selected' : '';
-            optionsHtml += `<option value="${id}" ${selected}>${nama}</option>`;
+        const pemateriArray = Array.isArray(masterPemateriData) ?
+            masterPemateriData :
+            Object.values(masterPemateriData || {});
+
+        pemateriArray.forEach((pemateri) => {
+            const pemateriId = pemateri.id_pemateri || pemateri.ID_PEMATERI;
+            const pemateriNama = pemateri.nama_pemateri || pemateri.NAMA_PEMATERI || 'Nama Tidak Tersedia';
+            if (pemateriId && pemateriNama) {
+                const isSelected = selectedPemateriId && (String(selectedPemateriId) === String(pemateriId));
+                optionsHtml += `<option value="${pemateriId}" ${isSelected ? 'selected' : ''}>${pemateriNama}</option>`;
+            }
         });
+
+        // Name of select changed to sesi[${sesiIdx}][id_pemateri] (no more array for pemateri_ids)
+        // Removed the "Hapus Pemateri Ini" button from here
         return `
-            <select name="sesi[${sesiIdx}][pemateri_id]" required
+            <select name="sesi[${sesiIdx}][id_pemateri]" required
                     class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                 ${optionsHtml}
             </select>
         `;
     }
+    
+    function updateSesiNumbers() {
+        const sesiItems = sesiContainer.querySelectorAll('.sesi-item');
+        sesiItems.forEach((sesi, index) => {
+            const sesiNumber = index + 1;
+            const header = sesi.querySelector('h3');
+            if (header) {
+                header.textContent = `Sesi ${sesiNumber}`;
+            }
+            const pemateriLabel = sesi.querySelector('label[class*="text-gray-700 mb-2"]');
+            if (pemateriLabel && pemateriLabel.textContent.includes('Pemateri Sesi')) {
+                 pemateriLabel.textContent = `Pemateri Sesi ${sesiNumber}`;
+            }
+            // No "Tambah Pemateri Lagi" button to update per session
+        });
+    }
 
     function addSesiField() {
         const currentIndex = getNextSesiIndex();
-        const sesiNumber = sesiContainer.children.length + 1;
+        const sesiNumber = sesiContainer.querySelectorAll('.sesi-item').length + 1;
 
         const sesiHTML = `
             <div class="p-4 bg-white border border-gray-300 rounded-lg shadow-sm sesi-item space-y-4" data-sesi-index="${currentIndex}">
                 <div class="flex justify-between items-center">
                     <h3 class="text-lg font-semibold text-gray-800">Sesi ${sesiNumber}</h3>
-                    <button type="button" title="Hapus Sesi Ini" 
+                    <button type="button" title="Hapus Sesi Ini"
                             class="remove-sesi flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -264,23 +317,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Sesi</label>
-                        <input type="date" name="sesi[${currentIndex}][tanggal]" 
+                        <input type="date" name="sesi[${currentIndex}][tanggal]"
                                class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Jam Mulai</label>
-                        <input type="time" name="sesi[${currentIndex}][jam_mulai]" 
+                        <input type="time" name="sesi[${currentIndex}][jam_mulai]"
                                class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Jam Selesai</label>
-                        <input type="time" name="sesi[${currentIndex}][jam_selesai]" 
+                        <input type="time" name="sesi[${currentIndex}][jam_selesai]"
                                class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm">
                     </div>
                 </div>
                 <div class="mt-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi</label>
-                    ${createPemateriSelectHtml(currentIndex)}
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi ${sesiNumber}</label>
+                    <div id="pemateri-container-${currentIndex}" class="space-y-2">
+                        ${createPemateriSelectHtml(currentIndex)}
+                    </div>
+                    {{-- Removed "Tambah Pemateri Lagi untuk Sesi Ini" button --}}
                 </div>
             </div>
         `;
@@ -294,16 +350,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (btn.classList.contains('add-sesi')) {
             addSesiField();
         } else if (btn.classList.contains('remove-sesi')) {
-            if (sesiContainer.children.length > 1) {
+            if (sesiContainer.querySelectorAll('.sesi-item').length > 1 || 
+                (sesiContainer.querySelectorAll('.sesi-item').length === 1 && !sesiContainer.querySelector('.sesi-item').hasAttribute('data-loaded-from-db'))) {
                 btn.closest('.sesi-item').remove();
+                updateSesiNumbers();
             } else {
                 alert('Minimal harus ada satu sesi kegiatan.');
             }
         }
+        // Removed event listeners for 'add-pemateri-sesi' and 'remove-pemateri-item'
     });
 
-    // Initialize first session if empty
-    if (sesiContainer.children.length === 0) addSesiField();
+    if (sesiContainer.children.length === 0) {
+        addSesiField();
+    } else {
+        sesiContainer.querySelectorAll('.sesi-item').forEach(item => item.setAttribute('data-loaded-from-db', 'true'));
+    }
+    updateSesiNumbers(); 
 });
 </script>
 @endsection
