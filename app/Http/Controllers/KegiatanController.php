@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Storage;
 
 class KegiatanController extends Controller
 {
-    protected $apiBaseUrl = 'https://e79e-2001-448a-c0f0-240e-fd08-8b26-a020-7701.ngrok-free.app/api'; 
+    protected $apiBaseUrl = 'https://7f61-202-51-113-148.ngrok-free.app/api'; 
 
     // Fungsi helper untuk mendapatkan ID berikutnya secara manual dari API
     private function getNextIdFromApi($endpoint, $idColumnName, $defaultId = 1)
@@ -142,7 +142,7 @@ class KegiatanController extends Controller
         return view('kegiatan', compact('kegiatan'));
     }
 
-    public function create()
+ public function create()
     {
         $masterPemateri = [];
         try {
@@ -156,8 +156,9 @@ class KegiatanController extends Controller
 
     public function store(Request $request)
     {
-        Log::info('[STORE_KEGIATAN_FINAL] Menerima request data:', $request->all());
+        Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Menerima request data:', $request->all());
 
+        // PERUBAHAN VALIDASI: Menyesuaikan dengan input 'pemateri_ids' sebagai array
         $validatedData = $request->validate([
             'judul' => 'required|string|max:50',
             'media' => 'required|string|max:20', 
@@ -170,10 +171,11 @@ class KegiatanController extends Controller
             'sesi.*.tanggal' => 'required|date_format:Y-m-d',
             'sesi.*.jam_mulai' => 'required|date_format:H:i',
             'sesi.*.jam_selesai' => 'nullable|date_format:H:i|after_or_equal:sesi.*.jam_mulai',
-            // PERUBAHAN: Validasi untuk 'id_pemateri' tunggal per sesi, bukan array 'pemateri_ids'
-            'sesi.*.id_pemateri' => 'required|numeric' 
+            'sesi.*.pemateri_ids' => 'required|array|min:1', // Setiap sesi harus punya array pemateri_ids
+            'sesi.*.pemateri_ids.*' => 'required|numeric' // Setiap ID di dalam array pemateri_ids harus numerik
         ]);
 
+        // LANGKAH 1: Simpan Data Kegiatan Utama
         $nextKegiatanId = $this->getNextIdFromApi('kegiatan', 'id_kegiatan');
         if ($nextKegiatanId === null) { 
              return back()->withInput()->withErrors(['api_error_kegiatan' => 'Gagal men-generate ID Kegiatan. Periksa koneksi atau log API.']);
@@ -187,26 +189,27 @@ class KegiatanController extends Controller
             'keterangan' => $validatedData['keterangan_kegiatan'] ?? '', 
         ];
 
-        Log::info('[STORE_KEGIATAN_FINAL] Mengirim data kegiatan utama ke API:', $apiKegiatanData);
+        Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Mengirim data kegiatan utama ke API:', $apiKegiatanData);
         $responseKegiatan = Http::post("{$this->apiBaseUrl}/kegiatan", $apiKegiatanData);
 
         if (!$responseKegiatan->successful() || $responseKegiatan->json('success') !== true) {
-            Log::error('[STORE_KEGIATAN_FINAL] Gagal menyimpan kegiatan utama via API: ' . $responseKegiatan->status() . ' - ' . $responseKegiatan->body(), $responseKegiatan->json() ?? []);
+            Log::error('[STORE_KEGIATAN_V6_FIX_VALIDATION] Gagal menyimpan kegiatan utama via API: ' . $responseKegiatan->status() . ' - ' . $responseKegiatan->body(), $responseKegiatan->json() ?? []);
             return back()->withInput()->withErrors(['api_error_kegiatan' => 'Gagal menyimpan data kegiatan utama: ' . ($responseKegiatan->json('message') ?? 'Error tidak diketahui dari API.') . ($responseKegiatan->json('errors') ? ' Details: '.json_encode($responseKegiatan->json('errors')) : '')]);
         }
-        Log::info('[STORE_KEGIATAN_FINAL] Respon API kegiatan utama:', $responseKegiatan->json());
+        Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Respon API kegiatan utama:', $responseKegiatan->json());
         $createdKegiatanId = $nextKegiatanId; 
 
+        // LANGKAH 2: Handle Upload File Sertifikat (Template)
         if ($request->hasFile('template_sertifikat') && $request->file('template_sertifikat')->isValid()) {
             try {
                 $file = $request->file('template_sertifikat');
                 $namaFileSertifikat = 'tpl_sert_keg_' . $createdKegiatanId . '_' . time() . '.' . $file->getClientOriginalExtension();
                 $file->storeAs('public/sertifikat_templates_kegiatan', $namaFileSertifikat); 
-                Log::info('[STORE_KEGIATAN_FINAL] Template sertifikat berhasil diunggah: ' . $namaFileSertifikat);
+                Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Template sertifikat berhasil diunggah: ' . $namaFileSertifikat);
                 
                 $nextSertifikatId = $this->getNextIdFromApi('sertifikat', 'id_sertifikat');
                  if ($nextSertifikatId === null) {
-                    Log::error("[STORE_KEGIATAN_FINAL] Gagal men-generate ID Sertifikat, proses sertifikat dihentikan untuk file: {$namaFileSertifikat}");
+                    Log::error("[STORE_KEGIATAN_V6_FIX_VALIDATION] Gagal men-generate ID Sertifikat, proses sertifikat dihentikan untuk file: {$namaFileSertifikat}");
                 } else {
                     $apiSertifikatData = [
                         'id' => $nextSertifikatId,
@@ -214,24 +217,25 @@ class KegiatanController extends Controller
                         'nama_file' => $namaFileSertifikat,
                         'nim' => 'TEMPLATE_KEGIATAN', 
                     ];
-                    Log::info('[STORE_KEGIATAN_FINAL] Mengirim data sertifikat template ke API:', $apiSertifikatData);
+                    Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Mengirim data sertifikat template ke API:', $apiSertifikatData);
                     $responseSertifikat = Http::post("{$this->apiBaseUrl}/sertifikat", $apiSertifikatData); 
                     if (!$responseSertifikat->successful() || $responseSertifikat->json('success') !== true) {
-                        Log::error('[STORE_KEGIATAN_FINAL] Gagal menyimpan info sertifikat template via API: ' . $responseSertifikat->status() . ' - ' . $responseSertifikat->body(), $responseSertifikat->json() ?? []);
+                        Log::error('[STORE_KEGIATAN_V6_FIX_VALIDATION] Gagal menyimpan info sertifikat template via API: ' . $responseSertifikat->status() . ' - ' . $responseSertifikat->body(), $responseSertifikat->json() ?? []);
                     } else {
-                        Log::info('[STORE_KEGIATAN_FINAL] Respon API sertifikat template:', $responseSertifikat->json());
+                        Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Respon API sertifikat template:', $responseSertifikat->json());
                     }
                 }
             } catch (\Exception $e) {
-                Log::error('[STORE_KEGIATAN_FINAL] Gagal mengunggah atau menyimpan info file sertifikat: ' . $e->getMessage());
+                Log::error('[STORE_KEGIATAN_V6_FIX_VALIDATION] Gagal mengunggah atau menyimpan info file sertifikat: ' . $e->getMessage());
             }
         }
         
+        // LANGKAH 3: Simpan Setiap Sesi Kegiatan (Jadwal) via API
         if (isset($validatedData['sesi']) && is_array($validatedData['sesi'])) {
             foreach ($validatedData['sesi'] as $indexSesi => $dataSesi) {
                 $nextJadwalId = $this->getNextIdFromApi('jadwal-kegiatan', 'id_jadwal'); 
                 if ($nextJadwalId === null) {
-                    Log::error("[STORE_KEGIATAN_FINAL] Gagal men-generate ID Jadwal untuk sesi index {$indexSesi}, proses jadwal ini dihentikan.");
+                    Log::error("[STORE_KEGIATAN_V6_FIX_VALIDATION] Gagal men-generate ID Jadwal untuk sesi index {$indexSesi}, proses jadwal ini dihentikan.");
                     continue; 
                 }
 
@@ -241,8 +245,9 @@ class KegiatanController extends Controller
                     $waktuSelesaiString = $dataSesi['tanggal'] . ' ' . $dataSesi['jam_selesai'] . ':00';
                 }
 
-                // Menggunakan 'id_pemateri' tunggal dari sesi
-                $idPemateriUntukSesiIni = $dataSesi['id_pemateri'] ?? 0; 
+                // Ambil ID Pemateri pertama dari array pemateri_ids untuk sesi ini
+                // karena API jadwal hanya menerima satu id_pemateri.
+                $idPemateriUntukSesiIni = $dataSesi['pemateri_ids'][0] ?? 0; 
                 if (empty($idPemateriUntukSesiIni) && $idPemateriUntukSesiIni !== 0) {
                     $idPemateriUntukSesiIni = 0;
                 }
@@ -259,17 +264,27 @@ class KegiatanController extends Controller
                     'kode_random' => Str::upper(Str::random(10)) 
                 ];
                 
-                Log::info("[STORE_KEGIATAN_FINAL] Mengirim data jadwal (Sesi ".($indexSesi+1).") ke API:", $apiJadwalData);
+                Log::info("[STORE_KEGIATAN_V6_FIX_VALIDATION] Mengirim data jadwal (Sesi ".($indexSesi+1).") ke API:", $apiJadwalData);
                 $responseJadwal = Http::post("{$this->apiBaseUrl}/jadwal-kegiatan", $apiJadwalData); 
                 if (!$responseJadwal->successful() || $responseJadwal->json('success') !== true) {
-                    Log::error('[STORE_KEGIATAN_FINAL] Gagal menyimpan jadwal kegiatan (Sesi '.($indexSesi+1).') via API: ' . $responseJadwal->status() . ' - ' . $responseJadwal->body(), $responseJadwal->json() ?? []);
+                    Log::error('[STORE_KEGIATAN_V6_FIX_VALIDATION] Gagal menyimpan jadwal kegiatan (Sesi '.($indexSesi+1).') via API: ' . $responseJadwal->status() . ' - ' . $responseJadwal->body(), $responseJadwal->json() ?? []);
                 } else {
-                     Log::info('[STORE_KEGIATAN_FINAL] Respon API jadwal (Sesi '.($indexSesi+1).'):', $responseJadwal->json());
+                     Log::info('[STORE_KEGIATAN_V6_FIX_VALIDATION] Respon API jadwal (Sesi '.($indexSesi+1).'):', $responseJadwal->json());
+                }
+
+                // LANGKAH 4 (per sesi): Simpan Relasi Pemateri dengan Kegiatan (PEMATERIKEGIATAN_PUST)
+                // Ini masih memerlukan endpoint API baru untuk tabel pivot.
+                if(isset($dataSesi['pemateri_ids']) && is_array($dataSesi['pemateri_ids'])){
+                    foreach ($dataSesi['pemateri_ids'] as $idPemateriDariForm) {
+                        if (!empty($idPemateriDariForm)) {
+                            Log::warning("[STORE_KEGIATAN_V6_FIX_VALIDATION] Memproses ID_PEMATERI: {$idPemateriDariForm} untuk kegiatan '{$createdKegiatanId}' (Sesi ".($indexSesi+1)."). Namun, TIDAK ADA ENDPOINT API untuk menyimpan relasi ini ke tabel pivot PEMATERIKEGIATAN_PUST. Data ini TIDAK AKAN TERSIMPAN.");
+                        }
+                    }
                 }
             }
         }
-        // Relasi pemateri ke kegiatan (tabel pivot) masih belum bisa dihandle karena tidak ada API
-        return redirect()->route('kegiatan.index')->with('success', 'Kegiatan berhasil diproses. Periksa log untuk detail.');
+
+        return redirect()->route('kegiatan.index')->with('success', 'Data kegiatan utama berhasil disimpan. Penyimpanan detail sesi (jadwal, sertifikat) telah dicoba (periksa log). Penyimpanan relasi pemateri per sesi memerlukan API tambahan.');
     }
     
     public function show(string $id)
