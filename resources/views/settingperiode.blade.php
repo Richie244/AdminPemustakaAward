@@ -20,7 +20,7 @@
 
         {{-- Card Formulir Utama --}}
         <div class="bg-white p-6 sm:p-8 shadow-xl rounded-2xl">
-            <h2 class="text-3xl font-bold mb-8 text-gray-800 border-b border-gray-200 pb-4">Pengaturan Periode Baru</h2>
+            <h2 class="text-3xl font-bold mb-8 text-gray-800 border-b border-gray-200 pb-4">Tambah Periode Baru</h2>
 
             {{-- Ganti action dengan route yang sesuai untuk menyimpan data --}}
             <form action="{{ route('periode.store') }}" method="POST" class="space-y-8"> 

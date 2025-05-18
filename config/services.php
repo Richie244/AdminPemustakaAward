@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'api' => [ // <--- TAMBAHKAN INI
+        'base_url' => env('MAIN_API_BASE_URL'), // Ganti MAIN_API_BASE_URL dengan nama variabel .env Anda
+        'key' => env('MAIN_API_KEY', null),
+    ],
+    
+        'external_api' => [
+        'base_url' => env('EXTERNAL_API_BASE_URL'),
+        'key' => env('EXTERNAL_API_KEY'), // Akan null jika EXTERNAL_API_KEY kosong di .env
+    ],
+
+        'civitas_api' => [ // Kunci spesifik untuk API Civitas Anda
+        'url' => env('CIVITAS_API_URL', 'https://178b-139-228-46-217.ngrok-free.app/api/civitas'), // Fallback jika .env tidak diset
+        'key' => env('CIVITAS_API_KEY', null), // Jika API Anda memerlukan key
+    ],
 ];

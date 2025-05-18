@@ -96,7 +96,7 @@
 
                 {{-- Bobot Nilai Keseluruhan Kegiatan --}}
                 <div>
-                    <label for="bobot_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Bobot Poin Keseluruhan Kegiatan</label>
+                    <label for="bobot_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Poin Kegiatan Per Sesi</label>
                     <input type="number" id="bobot_kegiatan" name="bobot_kegiatan" value="{{ old('bobot_kegiatan') }}" required min="0"
                            placeholder="Masukkan bobot poin total"
                            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
