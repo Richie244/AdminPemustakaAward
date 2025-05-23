@@ -1,10 +1,14 @@
 <?php
 
-use App\Http\Controllers\AksaraController;
-use App\Http\Controllers\KegiatanController; // Web Controller
-use App\Http\Controllers\PeriodeController;
-use App\Http\Controllers\LoginController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\KegiatanController;
+use App\Http\Controllers\SertifikatTemplateController;
+use App\Http\Controllers\AksaraController;
+use App\Http\Controllers\LoginController;
+use App\Http\Controllers\SertifikatGeneratorController;
+use App\Http\Controllers\PeriodeController;
+
+ // Pastikan ini di-import
 
 /*
 |--------------------------------------------------------------------------
@@ -12,37 +16,57 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+// Halaman utama aplikasi
 Route::get('/', function () {
-    return view('welcome'); // Atau halaman dashboard Anda
-});
+    if (session()->has('authenticated_civitas')) { 
+        return redirect()->route('periode.index'); 
+    }
+    return view('welcome'); 
+})->name('home');
 
+// Route untuk Login & Logout
 Route::get('/login', [LoginController::class, 'viewLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-// --- Route Kegiatan ---
+// --- Grup Route yang Memerlukan Autentikasi ---
+// Route::middleware(['auth.custom'])->group(function () { // Sesuaikan dengan middleware Anda
 
+    // --- Route Sertifikat Template ---
+    Route::resource('sertifikat-templates', SertifikatTemplateController::class)->only([
+        'index', 'store', 'destroy'
+    ]);
 
-Route::resource('kegiatan', KegiatanController::class)->parameters([
-    'kegiatan' => 'id'
-]); 
+    // --- Route Kegiatan ---
+    Route::resource('kegiatan', KegiatanController::class)->parameters([
+        'kegiatan' => 'id' 
+    ]); 
+    Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
 
-Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
+    // --- Route Periode ---
+    Route::get('/periode', [App\Http\Controllers\PeriodeController::class, 'index'])->name('periode.index'); 
+    Route::get('/periode/create', [App\Http\Controllers\PeriodeController::class, 'create'])->name('periode.create');
+    Route::post('/periode', [App\Http\Controllers\PeriodeController::class, 'store'])->name('periode.store'); 
+    Route::get('/periode/{id}', [App\Http\Controllers\PeriodeController::class, 'show'])->name('periode.show');    
 
+    // --- Route Aksara (Validasi) ---
+    Route::prefix('validasi-aksara')->name('validasi.aksara.')->group(function () {
+        Route::get('/', [AksaraController::class, 'index'])->name('index');
+        Route::get('/{id}/detail', [AksaraController::class, 'show'])->name('detail');
+        Route::post('/{id}/setuju', [AksaraController::class, 'setuju'])->name('setuju');
+        Route::post('/{id}/tolak', [AksaraController::class, 'tolak'])->name('tolak');  
+    });
 
-// --- Route Periode ---
-Route::get('/periode', [PeriodeController::class, 'index'])->name('periode.index'); 
-Route::get('/settingperiode', [PeriodeController::class, 'create'])->name('periode.create');
-Route::post('/periode', [PeriodeController::class, 'store'])->name('periode.store'); 
-Route::get('/detailperiode/{id}', [PeriodeController::class, 'show'])->name('periode.show'); 
-// Route::get('/settingperiode', [PeriodeController::class, 'create']); // Sudah dicakup oleh periode.create
+    // --- Route BARU untuk Generate Sertifikat ---
+    // Parameter {idKegiatan} dan {nim} akan dinamis
+    // Parameter {peran?} adalah opsional, defaultnya akan dihandle di controller
+    Route::get('/sertifikat/generate/kegiatan/{idKegiatan}/peserta/{nim}/{peran?}', [SertifikatGeneratorController::class, 'generateUntukKegiatanSatu'])
+        ->name('sertifikat.generate.peserta');
+    Route::get('/generate-sertifikat/kegiatan-1/{nim}', [SertifikatGeneratorController::class, 'generateUntukKegiatanSatu'])
+        ->name('sertifikat.generate.kegiatan1');
+    // Catatan: Metode 'generateUntukKegiatanSatu' mungkin perlu diubah namanya menjadi lebih generik
+    // jika tidak lagi spesifik untuk "kegiatan 1" saja.
+    // Atau, Anda bisa membuat metode baru di controller untuk menangani ID kegiatan dinamis.
+    // Untuk saat ini, kita akan tetap menggunakan 'generateUntukKegiatanSatu' tapi idKegiatan dari URL akan menggantikan '1' yang di-hardcode.
 
-
-// --- Route Aksara ---
-Route::get('/aksara', [AksaraController::class, 'index'])->name('aksara.index');
-// Pastikan parameter route konsisten dengan yang diharapkan Controller
-Route::get('/aksara/{id}/detail', [AksaraController::class, 'show'])->name('aksara.detail'); 
-Route::post('/aksara/{id}/setuju', [AksaraController::class, 'setuju'])->name('aksara.setuju'); 
-Route::post('/aksara/{id}/tolak', [AksaraController::class, 'tolak'])->name('aksara.tolak'); 
-Route::get('/validasi-aksara', [AksaraController::class, 'index'])->name('validasi.aksara.index');
-
+// }); // Akhir grup middleware

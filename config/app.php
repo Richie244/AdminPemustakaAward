@@ -65,7 +65,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'Asia/Jakarta'),
 
     /*
     |--------------------------------------------------------------------------
@@ -123,4 +123,8 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+
+    // di config/app.php
+    'dummy_kegiatan_id_for_template' => env('DUMMY_KEGIATAN_ID_FOR_TEMPLATE', '0'),
+    'global_template_nim_identifier' => env('GLOBAL_TEMPLATE_NIM_IDENTIFIER', 'TPLGLB'),
 ];

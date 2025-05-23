@@ -1,10 +1,16 @@
 @extends('layouts.app') 
 
 @section('title', 'Daftar Kegiatan')
-@section('page_title', 'Manajemen Kegiatan') {{-- Untuk judul di App Bar --}}
+@section('page_title', 'Manajemen Kegiatan')
+
+@push('styles')
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+@endpush
 
 @section('content') 
-<div class="min-h-screen pt-2 pb-8 px-2">  
+<div class="min-h-screen pt-2 pb-8 px-2"> 
     <div>  
         <div class="bg-white p-6 shadow-lg rounded-xl overflow-hidden"> 
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200 gap-4"> 
@@ -14,7 +20,7 @@
                     <form action="{{ route('kegiatan.index') }}" method="GET" class="flex w-full sm:w-auto">
                         <input type="text" name="search" placeholder="Cari judul, lokasi, pemateri..." 
                                value="{{ $searchTerm ?? '' }}" 
-                               class="border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-l-md shadow-sm text-sm py-2 px-3 w-full sm:min-w-[250px]">
+                               class="border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-l-md shadow-sm text-sm py-2 px-3 w-full sm:min-w-[200px] md:min-w-[250px]">
                         <button type="submit" 
                                 class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-r-md text-sm inline-flex items-center">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -27,6 +33,12 @@
                         </a>
                         @endif
                     </form>
+
+                    <a href="{{ route('sertifikat-templates.index') }}" 
+                       class="bg-teal-500 hover:bg-teal-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Kelola Template
+                    </a>
 
                     <a href="{{ route('kegiatan.create') }}"  
                        class="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center"> 
@@ -55,7 +67,6 @@
                     <p>{{ $errors->first('api_error') }}</p>
                 </div>
             @endif
-
 
             @if($kegiatan->isEmpty()) 
                 <div class="text-center py-10 text-gray-500"> 
@@ -93,8 +104,12 @@
                                 <th scope="col" class="px-6 py-3 text-center text-sm font-semibold text-gray-600">Aksi</th> 
                             </tr> 
                         </thead> 
-                        <tbody class="divide-y divide-gray-200">  
+                        <tbody class="divide-y divide-gray-200" x-data="{}">  
                             @foreach ($kegiatan as $index => $k)  
+                                @php 
+                                    // Pastikan $kegiatanId selalu memiliki nilai alphanumeric yang valid untuk Alpine
+                                    $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
+                                @endphp
                                 <tr class="hover:bg-gray-50 transition-colors duration-150"> 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $kegiatan->firstItem() + $index }}</td> 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{{ $k->judul_kegiatan ?? ($k->JUDUL_KEGIATAN ?? '-') }}</td> 
@@ -117,26 +132,23 @@
                                     </td> 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-center"> 
                                         <div class="flex items-center justify-center space-x-1"> 
-                                            @php $kegiatanId = $k->id_kegiatan ?? $k->ID_KEGIATAN ?? null; @endphp 
-                                            @if($kegiatanId) 
-                                                {{-- Tombol Detail/Edit (mengarah ke kegiatan.show) dengan ikon pensil --}} 
-                                                <a href="{{ route('kegiatan.show', $kegiatanId) }}" class="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 px-2.5 py-1 rounded-md text-xs" title="Lihat Detail/Edit"> 
-                                                    <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> 
+                                            @php $kegiatanIdRoute = $k->id_kegiatan ?? $k->ID_KEGIATAN ?? null; @endphp 
+                                            @if($kegiatanIdRoute) 
+                                                <a href="{{ route('kegiatan.show', $kegiatanIdRoute) }}" class="text-yellow-600 hover:text-yellow-800 p-1 rounded-md hover:bg-yellow-100" title="Lihat Detail/Edit"> 
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> 
+                                                </a> 
+                                                <a href="{{ route('kegiatan.daftar-hadir', $kegiatanIdRoute) }}" class="text-green-600 hover:text-green-800 p-1 rounded-md hover:bg-green-100" title="Daftar Hadir"> 
+                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M12 7a4 4 0 110 8 4 4 0 010-8z"></path></svg> 
                                                 </a> 
                                                 
-                                                {{-- Tombol Daftar Hadir (tetap) --}} 
-                                                <a href="{{ route('kegiatan.daftar-hadir', $kegiatanId) }}" class="bg-green-100 text-green-600 hover:bg-green-200 px-2.5 py-1 rounded-md text-xs" title="Daftar Hadir"> 
-                                                     <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M12 7a4 4 0 110 8 4 4 0 010-8z"></path></svg> 
-                                                </a> 
-                                                
-                                                {{-- Tombol Salin Link (tetap) --}} 
-                                                @if(Route::has('kegiatan.show')) 
-                                                <button id="copyBtn-{{$kegiatanId}}" onclick="salinLink('{{ route('kegiatan.show', $kegiatanId) }}', 'copyBtn-{{$kegiatanId}}')" class="bg-indigo-100 text-indigo-600 hover:bg-indigo-200 px-2.5 py-1 rounded-md text-xs" title="Salin Link"> 
-                                                    <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> 
-                                                </button> 
-                                                @endif 
+                                                <button type="button"
+                                                        @click="$dispatch('open-modal', { id: '{{ $kegiatanIdAlpine }}' })"
+                                                        class="text-indigo-600 hover:text-indigo-800 p-1 rounded-md hover:bg-indigo-100" 
+                                                        title="Lihat Kode Presensi"> 
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                                </button>
                                             @else 
-                                                <span class="text-xs text-gray-400">N/A</span> 
+                                                <span class="text-xs text-gray-400">N/A (ID Error)</span> 
                                             @endif 
                                         </div> 
                                     </td> 
@@ -145,9 +157,7 @@
                         </tbody>  
                     </table> 
                 </div> 
-                {{-- Pagination Links --}} 
                 <div class="mt-6"> 
-                    {{-- Pastikan $kegiatan adalah instance Paginator --}}
                     @if ($kegiatan instanceof \Illuminate\Pagination\LengthAwarePaginator)
                         {{ $kegiatan->links('vendor.pagination.tailwind') }} 
                     @endif
@@ -157,26 +167,111 @@
     </div> 
 </div> 
 
+<!-- Modal Components -->
+@foreach ($kegiatan as $index => $k)
+    @php 
+        $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
+    @endphp
+    @if($k->jadwal->isNotEmpty())
+        <div x-data="{ 
+                show: false, 
+                id: '{{ $kegiatanIdAlpine }}' 
+            }" 
+            x-show="show" 
+            x-on:open-modal.window="if ($event.detail.id === id) { show = true }" 
+            x-on:close-modal.window="if ($event.detail.id === id) { show = false }" 
+            x-on:keydown.escape.window="show = false" 
+            x-cloak
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+            <div @click.outside="show = false" 
+                 x-transition
+                 class="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">Kode Presensi: {{ $k->judul_kegiatan ?? ($k->JUDUL_KEGIATAN ?? '-') }}</h3>
+                    <button @click="show = false" class="text-gray-400 hover:text-gray-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    @forelse($k->jadwal as $jadwalIndex => $jadwalSesi)
+                        @if(property_exists($jadwalSesi, 'kode_random') && !empty($jadwalSesi->kode_random))
+                        <div class="p-3 border rounded-md bg-gray-50 flex justify-between items-center">
+                            <div>
+                                <p class="text-sm text-gray-500">
+                                    Sesi {{ $jadwalIndex + 1 }}: 
+                                    {{ property_exists($jadwalSesi, 'tgl_kegiatan') ? \Carbon\Carbon::parse($jadwalSesi->tgl_kegiatan)->translatedFormat('d M Y') : '' }}
+                                    @if(property_exists($jadwalSesi, 'waktu_mulai'))
+                                        ({{ \Carbon\Carbon::parse($jadwalSesi->waktu_mulai)->format('H:i') }})
+                                    @endif
+                                </p>
+                                <p class="text-lg font-mono font-semibold text-indigo-600" id="kodePresensi-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}">
+                                    {{ $jadwalSesi->kode_random }}
+                                </p>
+                            </div>
+                            <button onclick="salinKodePresensi('{{ $jadwalSesi->kode_random }}', 'copyBtnText-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}')" 
+                                    class="copy-button bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs inline-flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                <span id="copyBtnText-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}">Salin</span>
+                            </button>
+                        </div>
+                        @endif
+                    @empty
+                        <p class="text-gray-500 text-sm">Tidak ada kode presensi tersedia untuk sesi di kegiatan ini.</p>
+                    @endforelse
+                    @if($k->jadwal->isNotEmpty() && $k->jadwal->filter(fn($j) => property_exists($j, 'kode_random') && !empty($j->kode_random))->isEmpty())
+                        <p class="text-gray-500 text-sm">Tidak ada kode presensi pada sesi manapun untuk kegiatan ini.</p>
+                    @endif
+                </div>
+                <div class="mt-6 text-right">
+                    <button @click="show = false" 
+                            class="px-5 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-150">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+@endforeach
+@endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
 <script> 
-    function salinLink(url, buttonId) { 
-        navigator.clipboard.writeText(url).then(function() { 
-            const button = document.getElementById(buttonId); 
-            if (!button) return;  
-            const originalContent = button.innerHTML;  
-            button.innerHTML = ` 
-                <svg class="w-4 h-4 text-green-500 inline-block" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg> 
-            `;  
-            button.disabled = true;  
+    function salinKodePresensi(kode, buttonTextId) {
+        console.log('Mencoba menyalin kode:', kode, 'untuk buttonTextId:', buttonTextId);
+        if (!navigator.clipboard) {
+            alert('Browser Anda tidak mendukung fitur salin ke clipboard.');
+            console.error('Clipboard API tidak tersedia.');
+            return;
+        }
+        navigator.clipboard.writeText(kode).then(function() { 
+            const buttonTextSpan = document.getElementById(buttonTextId); 
+            if (!buttonTextSpan) {
+                console.error('Element span untuk teks tombol tidak ditemukan dengan ID:', buttonTextId);
+                return;  
+            }
+            
+            const originalText = buttonTextSpan.innerText;
+            buttonTextSpan.innerText = 'Disalin!';
+            
+            const buttonElement = buttonTextSpan.closest('button');
+            if(buttonElement) buttonElement.disabled = true;
 
             setTimeout(() => { 
-                button.innerHTML = originalContent; 
-                button.disabled = false; 
-            }, 1500);  
+                buttonTextSpan.innerText = originalText;
+                if(buttonElement) buttonElement.disabled = false;
+            }, 2000);  
 
         }).catch(function(err) { 
-            console.error("Gagal menyalin link: ", err); 
-            alert("Gagal menyalin link. Pastikan Anda menggunakan koneksi aman (HTTPS) jika ada."); 
+            console.error("Gagal menyalin kode presensi:", err); 
+            alert("Gagal menyalin kode presensi. Pastikan halaman diakses melalui HTTPS atau localhost. Error: " + err.message); 
         }); 
     } 
 </script> 
-@endsection
+@endpush

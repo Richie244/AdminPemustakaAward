@@ -11,13 +11,11 @@ class MyApiService
 {
     protected PendingRequest $httpClient;
     protected string $serviceConfigKeyUsed;
+    protected array $primaryKeyMap;
 
     public function __construct(string $configKey = 'services.api')
     {
         $this->serviceConfigKeyUsed = $configKey;
-        // Mengambil base URL dari konfigurasi. Pastikan ini adalah base URL yang benar
-        // untuk SEMUA endpoint yang diakses service ini, termasuk /api/civitas jika endpointnya 'civitas'.
-        // Jika /api/civitas ada di domain/port yang berbeda, Anda perlu service terpisah atau cara konfigurasi yang lebih canggih.
         $baseUrl = config("{$configKey}.base_url");
         $apiKey = config("{$configKey}.key");
 
@@ -32,13 +30,32 @@ class MyApiService
             });
 
         if ($apiKey) {
-            $this->httpClient->withToken($apiKey); 
+            $this->httpClient->withToken($apiKey);
         }
+
+        $this->primaryKeyMap = [
+            'sertifikat' => 'id',
+            'kegiatan' => 'id_kegiatan',
+            'civitas' => 'id_civitas',
+            'histori-status' => 'id_histori_status',
+            'periode_award' => 'id_periode', // Primary key untuk tabel periode
+            'rangekunjungan_award' => 'id_range_kunjungan', // Primary key untuk tabel range kunjungan
+            'reward_award' => 'id_reward', // Primary key untuk tabel reward
+            'pembobotan_award' => 'id_pembobotan', // Primary key untuk tabel pembobotan
+            'default' => 'id',
+        ];
     }
 
     public static function make(string $configKey = 'services.api'): self
     {
         return new self($configKey);
+    }
+
+    public function getPrimaryKeyName(string $endpointName): string
+    {
+        // Bersihkan nama endpoint jika mengandung path, misal 'api/periode' menjadi 'periode'
+        $cleanedEndpointName = last(explode('/', strtolower($endpointName)));
+        return $this->primaryKeyMap[$cleanedEndpointName] ?? $this->primaryKeyMap['default'];
     }
 
     protected function handleResponse(Response $response, string $errorMessagePrefix = 'Operasi API gagal'): ?array
@@ -51,50 +68,95 @@ class MyApiService
                 'config_key' => $this->serviceConfigKeyUsed,
             ]);
             return [
-                '_error' => true, 
-                '_status' => $response->status(), 
-                '_body' => $response->body(), 
+                '_error' => true,
+                '_status' => $response->status(),
+                '_body' => $response->body(),
                 '_json_error_data' => $response->json()
             ];
         }
         
         if ($response->successful() && empty($response->body())) {
             return [
-                '_success_no_content' => true, 
+                '_success_no_content' => true,
                 '_status' => $response->status()
             ];
         }
 
-        return $response->json(); 
+        $jsonData = $response->json();
+        if ($jsonData === null && !empty($response->body())) {
+            Log::warning("{$errorMessagePrefix}: Response body bukan JSON valid meskipun request sukses.", [
+                'status' => $response->status(),
+                'body' => $response->body(),
+                'url' => $response->effectiveUri()->__toString(),
+            ]);
+            return [
+                '_error' => true,
+                '_status' => $response->status(),
+                '_body' => $response->body(),
+                '_message' => 'Response body bukan JSON valid.'
+            ];
+        }
+        return $jsonData;
     }
 
-    public function getNextId(string $endpoint, string $idColumnName, int $defaultId = 1): ?int
+    public function getNextId(string $endpoint, string $idColumnName = null, int $defaultId = 1): ?int
     {
+        // Jika idColumnName tidak disediakan, coba ambil dari primaryKeyMap
+        if ($idColumnName === null) {
+            $idColumnName = $this->getPrimaryKeyName($endpoint);
+        }
+
         try {
             Log::info("[SERVICE_GET_NEXT_ID] Fetching next ID for endpoint: {$endpoint}, column: {$idColumnName}");
-            $apiResponse = $this->httpClient->get($endpoint); 
-            $responseData = $this->handleResponse($apiResponse, "[SERVICE_GET_NEXT_ID] Gagal mengambil data dari API {$endpoint}");
+            
+            $apiResponse = null;
+            $rawHttpResponse = null; 
 
-            if (isset($responseData['_error'])) { 
-                 Log::error("[SERVICE_GET_NEXT_ID] Error dari handleResponse untuk {$endpoint}.");
-                 return null;
+            // Panggil GET langsung ke endpoint untuk mendapatkan semua data
+            // Asumsi endpoint ini mengembalikan list semua item dari tabel terkait
+            $rawHttpResponse = $this->httpClient->get($endpoint); 
+            $apiResponse = $this->handleResponse($rawHttpResponse, "[SERVICE_GET_NEXT_ID] Gagal mengambil data dari API {$endpoint} untuk getNextId");
+
+            if (!$apiResponse || isset($apiResponse['_error'])) {
+                $statusErrorCode = $apiResponse['_status'] ?? ($rawHttpResponse ? $rawHttpResponse->status() : null);
+                if ($statusErrorCode == 404) {
+                    Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} mengembalikan 404 (Not Found). Ini dianggap sebagai 'belum ada data'. Memulai ID dari {$defaultId}.");
+                    return $defaultId;
+                }
+                Log::error("[SERVICE_GET_NEXT_ID] Error saat mengambil data dari API {$endpoint} untuk kalkulasi next ID (bukan 404).", $apiResponse ?? ['raw_status' => $statusErrorCode]);
+                return null;
             }
 
-            if (isset($responseData['_success_no_content']) || empty($responseData)) {
-                Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} returned empty data or no content. Starting ID from {$defaultId}.");
+            // Jika API mengembalikan data dalam key 'data'
+            $itemsToIterate = $apiResponse;
+            if (isset($apiResponse['data']) && is_array($apiResponse['data'])) {
+                $itemsToIterate = $apiResponse['data'];
+            } elseif (is_array($itemsToIterate) && count($itemsToIterate) > 0 && !is_array(current($itemsToIterate)) && !isset($itemsToIterate[0])) {
+                 // Kondisi ini mencoba mendeteksi jika $itemsToIterate adalah array asosiatif tunggal (objek JSON tunggal)
+                 // bukan array dari objek. Jika ya, ini bukan list untuk diiterasi.
+                 Log::warning("[SERVICE_GET_NEXT_ID] Respons dari {$endpoint} bukan array dari item (mungkin objek tunggal). Menganggap belum ada data, memulai ID dari {$defaultId}.");
+                 return $defaultId;
+            }
+
+
+            if (isset($apiResponse['_success_no_content']) || (is_array($itemsToIterate) && empty($itemsToIterate))) {
+                Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} mengembalikan data kosong atau no content. Memulai ID dari {$defaultId}.");
                 return $defaultId;
             }
 
-            if (is_array($responseData)) {
+            if (is_array($itemsToIterate)) {
                 $maxId = 0;
-                foreach ($responseData as $item) {
+                foreach ($itemsToIterate as $item) {
+                    if (!is_array($item) && !is_object($item)) continue; // Lewati jika item bukan array atau objek
                     $itemObject = (object) $item;
                     $currentId = null;
-                    $possibleIdKeys = [strtolower($idColumnName), $idColumnName, strtoupper($idColumnName), 'id', 'ID'];
+                    // Memastikan $idColumnName selalu ada di $possibleIdKeys
+                    $possibleIdKeys = array_unique([strtolower($idColumnName), $idColumnName, strtoupper($idColumnName), 'id', 'ID']);
+
                     foreach($possibleIdKeys as $key) {
                         if (property_exists($itemObject, $key) && is_numeric($itemObject->{$key})) {
                             $currentId = (int) $itemObject->{$key};
-                            break; 
+                            break;
                         }
                     }
                     if ($currentId !== null && $currentId > $maxId) {
@@ -102,19 +164,53 @@ class MyApiService
                     }
                 }
                 $nextId = $maxId + 1;
-                Log::info("[SERVICE_GET_NEXT_ID] Max ID found: {$maxId}, Next ID: {$nextId} for {$endpoint}");
+                Log::info("[SERVICE_GET_NEXT_ID] Max ID ditemukan: {$maxId}, Next ID: {$nextId} untuk {$endpoint}");
                 return $nextId;
             } else {
-                Log::error("[SERVICE_GET_NEXT_ID] Data dari API {$endpoint} bukan array atau format tidak dikenal setelah pengecekan.", ['response_body' => $responseData]);
+                Log::error("[SERVICE_GET_NEXT_ID] Data dari API {$endpoint} bukan array atau format tidak dikenal setelah pengecekan.", ['response_body' => $apiResponse]);
             }
         } catch (\Exception $e) {
-            Log::error("[SERVICE_GET_NEXT_ID] Exception saat mengambil data dari API {$endpoint}: " . $e->getMessage());
+            Log::error("[SERVICE_GET_NEXT_ID] Exception saat mengambil data dari API {$endpoint}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
         }
         Log::warning("[SERVICE_GET_NEXT_ID] Gagal mendapatkan ID berikutnya dari API untuk {$endpoint}. Menggunakan fallback null.");
         return null;
     }
 
-    // --- Metode untuk endpoint KEGIATAN ---
+    // --- Metode untuk endpoint PERIODE_AWARD ---
+    public function getPeriodeList(array $params = []): ?array {
+        return $this->handleResponse($this->httpClient->get('periode', $params), 'Gagal mengambil daftar periode');
+    }
+    public function createPeriode(array $data): ?array {
+        return $this->handleResponse($this->httpClient->asJson()->post('periode', $data), 'Gagal membuat periode');
+    }
+    // Metode update dan delete periode bisa ditambahkan jika perlu, mengikuti pola ControllerPeriode
+
+    // --- Metode untuk endpoint RANGEKUNJUNGAN_AWARD ---
+    public function getRangeKunjunganList(array $params = []): ?array {
+        return $this->handleResponse($this->httpClient->get('range-kunjungan', $params), 'Gagal mengambil daftar range kunjungan');
+    }
+    public function createRangeKunjungan(array $data): ?array {
+        return $this->handleResponse($this->httpClient->asJson()->post('range-kunjungan', $data), 'Gagal membuat range kunjungan');
+    }
+
+    // --- Metode untuk endpoint REWARD_AWARD ---
+    public function getRewardList(array $params = []): ?array {
+        return $this->handleResponse($this->httpClient->get('reward', $params), 'Gagal mengambil daftar reward');
+    }
+    public function createReward(array $data): ?array {
+        return $this->handleResponse($this->httpClient->asJson()->post('reward', $data), 'Gagal membuat reward');
+    }
+
+    // --- Metode untuk endpoint PEMBOBOTAN_AWARD ---
+    public function getPembobotanList(array $params = []): ?array {
+        return $this->handleResponse($this->httpClient->get('pembobotan', $params), 'Gagal mengambil daftar pembobotan');
+    }
+    public function createPembobotan(array $data): ?array {
+        return $this->handleResponse($this->httpClient->asJson()->post('pembobotan', $data), 'Gagal membuat pembobotan');
+    }
+
+
+    // --- Metode lainnya yang sudah ada ---
     public function getKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('kegiatan', $params), 'Gagal mengambil daftar kegiatan');
     }
@@ -128,7 +224,6 @@ class MyApiService
         return $this->handleResponse($this->httpClient->delete("kegiatan/{$id}"), "Gagal menghapus kegiatan ID: {$id}");
     }
 
-    // --- Metode untuk endpoint JADWAL KEGIATAN ---
     public function getJadwalKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('jadwal-kegiatan', $params), 'Gagal mengambil daftar jadwal kegiatan');
     }
@@ -139,12 +234,10 @@ class MyApiService
         return $this->handleResponse($this->httpClient->delete("jadwal-kegiatan/{$id}"), "Gagal menghapus jadwal kegiatan ID: {$id}");
     }
 
-    // --- Metode untuk endpoint PEMATERI KEGIATAN ---
     public function getPemateriKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri kegiatan');
     }
 
-    // --- Metode untuk endpoint SERTIFIKAT ---
     public function getSertifikatList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('sertifikat', $params), 'Gagal mengambil daftar sertifikat');
     }
@@ -154,53 +247,31 @@ class MyApiService
     public function deleteSertifikat(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("sertifikat/{$id}"), "Gagal menghapus sertifikat ID: {$id}");
     }
-
-    // --- Metode untuk endpoint HADIR KEGIATAN ---
+    
     public function getHadirKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('hadir-kegiatan', $params), 'Gagal mengambil daftar hadir kegiatan');
     }
     public function deleteHadirKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("hadir-kegiatan/{$id}"), "Gagal menghapus hadir kegiatan ID: {$id}");
     }
-
-    // --- Metode untuk Aksara Dinamika ---
-    public function getAksaraDinamikaList(array $queryParams = []): ?array
-    {
-        return $this->handleResponse(
-            $this->httpClient->get('aksara-dinamika', $queryParams), 
-            'Gagal mengambil daftar Aksara Dinamika'
-        );
+    
+    public function getAksaraDinamikaList(array $queryParams = []): ?array {
+        return $this->handleResponse($this->httpClient->get('aksara-dinamika', $queryParams),'Gagal mengambil daftar Aksara Dinamika');
     }
-
-    public function createAksaraHistoriStatus(array $data): ?array
-    {
+    public function createAksaraHistoriStatus(array $data): ?array {
         Log::info('[SERVICE_CREATE_HISTORI_STATUS] Mengirim data ke API /histori-status:', $data);
-        return $this->handleResponse(
-            $this->httpClient->asJson()->post('histori-status', $data), 
-            'Gagal membuat histori status Aksara Dinamika'
-        );
+        return $this->handleResponse($this->httpClient->asJson()->post('histori-status', $data), 'Gagal membuat histori status Aksara Dinamika');
     }
-
-    public function readHistoriStatus(array $queryParams = []): ?array
-    {
-        return $this->handleResponse(
-            $this->httpClient->get('histori-status', $queryParams),
-            'Gagal membaca data Histori Status'
-        );
+    public function readHistoriStatus(array $queryParams = []): ?array {
+        $rawHttpResponse = $this->httpClient->get('histori-status', $queryParams);
+        $handledResponse = $this->handleResponse($rawHttpResponse, 'Gagal membaca data Histori Status');
+        if (isset($handledResponse['_error']) && isset($handledResponse['_status']) && $handledResponse['_status'] == 404) {
+            Log::info("[SERVICE_READ_HISTORI_STATUS] Endpoint histori-status mengembalikan 404. Mengembalikan array kosong.");
+            return [];
+        }
+        return $handledResponse;
     }
-
-    // --- Metode BARU untuk mengambil daftar Civitas ---
-    /**
-     * Mengambil daftar semua civitas.
-     * @return array|null Daftar civitas atau null jika error.
-     */
-    public function getCivitasList(array $queryParams = []): ?array
-    {
-        // Asumsi endpoint adalah 'civitas'. Sesuaikan jika berbeda.
-        // Pastikan base URL yang dikonfigurasi untuk service ini juga mencakup endpoint civitas.
-        return $this->handleResponse(
-            $this->httpClient->get('civitas', $queryParams),
-            'Gagal mengambil daftar Civitas'
-        );
+    public function getCivitasList(array $queryParams = []): ?array {
+        return $this->handleResponse($this->httpClient->get('civitas', $queryParams),'Gagal mengambil daftar Civitas');
     }
 }

@@ -104,7 +104,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4">
-                            <a href="{{ route('aksara.detail', ['id' => $item->id]) }}" 
+                            <a href="{{ route('validasi.aksara.detail', ['id' => $item->id]) }}" 
                                class="bg-blue-100 text-blue-600 px-3 py-1.5 rounded-md text-sm hover:bg-blue-200 transition duration-150">
                                 Detail
                             </a>

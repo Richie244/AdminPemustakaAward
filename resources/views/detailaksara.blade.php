@@ -13,8 +13,7 @@
     {{-- Header Halaman Detail --}}
     <div class="flex justify-between items-center mb-8 border-b pb-4">
         <div class="flex items-center space-x-3">
-            {{-- Tombol Kembali --}}
-            <a href="{{ route('validasi.aksara.index', request()->query()) }}" {{-- request()->query() untuk membawa parameter filter/page kembali --}}
+            <a href="{{ route('validasi.aksara.index', request()->query()) }}"
                class="text-gray-600 hover:text-gray-800 transition-colors duration-150 p-2 rounded-full hover:bg-gray-100" title="Kembali ke Daftar Validasi">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -24,10 +23,9 @@
         </div>
         {{-- Status Badge --}}
         <span class="px-4 py-1 rounded-full text-sm font-medium
-            @if(strtolower($peserta->STATUS ?? 'pending') === 'ditolak') bg-red-100 text-red-600
+            @if(strtolower($peserta->STATUS ?? 'pending') === 'ditolak') bg-red-100 text-red-600 
             @elseif(strtolower($peserta->STATUS ?? 'pending') === 'diterima') bg-green-100 text-green-600
             @else bg-yellow-100 text-yellow-600 @endif">
-            {{-- Pastikan nilai 'diterima' dan 'ditolak' konsisten dengan yang ada di controller saat mapping status --}}
             {{ ucfirst(strtolower($peserta->STATUS ?? 'pending') === 'pending' ? 'Menunggu' : (strtolower($peserta->STATUS ?? 'pending') === 'diterima' ? 'Diterima' : 'Ditolak')) }}
         </span>
     </div>
@@ -110,8 +108,23 @@
         </div>
     </div>
 
+    {{-- Untuk Debugging (bisa dihapus setelah selesai) --}}
+    {{-- 
+    <div class="my-4 p-4 border border-dashed border-orange-400 bg-orange-50">
+        <h3 class="font-bold text-orange-700">DEBUG INFO:</h3>
+        <p class="text-sm text-orange-600">Status dari Controller: '{{ $peserta->STATUS ?? 'NULL' }}'</p>
+        <p class="text-sm text-orange-600">Alasan Penolakan dari Controller: 
+            @if(isset($peserta->ALASAN_PENOLAKAN))
+                '{{ $peserta->ALASAN_PENOLAKAN }}' (empty? {{ empty($peserta->ALASAN_PENOLAKAN) ? 'Ya' : 'Tidak' }})
+            @else
+                Properti ALASAN_PENOLAKAN tidak ada.
+            @endif
+        </p>
+    </div>
+    --}}
+
     {{-- Alasan Penolakan (jika status ditolak) --}}
-    @if(strtolower($peserta->STATUS ?? 'pending') === 'ditolak' && !empty($peserta->ALASAN_PENOLAKAN))
+    @if(strtolower($peserta->STATUS ?? 'pending') === 'ditolak' && !empty(trim((string)($peserta->ALASAN_PENOLAKAN ?? ''))))
     <div class="bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
         <h2 class="text-lg font-semibold text-red-700 mb-2">Alasan Penolakan</h2>
         <p class="text-red-600">{{ $peserta->ALASAN_PENOLAKAN }}</p>
@@ -147,7 +160,7 @@
     {{-- Tombol Aksi Validasi --}}
     <div class="flex justify-end gap-4 border-t pt-6">
         @if(strtolower($peserta->STATUS ?? 'pending') === 'pending')
-            <form method="POST" action="{{ route('aksara.setuju', ['id' => $peserta->id]) }}">
+            <form method="POST" action="{{ route('validasi.aksara.setuju', ['id' => $peserta->id]) }}">
                 @csrf
                 @foreach(request()->query() as $key => $value)
                     <input type="hidden" name="{{ $key }}" value="{{ $value }}">
@@ -192,7 +205,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
-            <form method="POST" action="{{ route('aksara.tolak', ['id' => $peserta->id]) }}"> 
+            <form method="POST" action="{{ route('validasi.aksara.tolak', ['id' => $peserta->id]) }}"> 
                 @csrf
                 @foreach(request()->query() as $key => $value)
                     @if(!in_array($key, ['alasan', 'id']))
@@ -224,6 +237,5 @@
 @endsection
 
 @push('scripts')
-{{-- Memastikan AlpineJS dimuat untuk halaman ini --}}
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 @endpush
