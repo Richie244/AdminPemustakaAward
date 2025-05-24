@@ -34,14 +34,22 @@ class MyApiService
         }
 
         $this->primaryKeyMap = [
-            'sertifikat' => 'id',
+            'sertifikat' => 'id', // Asumsi dari controller sebelumnya, bisa juga 'id_sertifikat'
             'kegiatan' => 'id_kegiatan',
             'civitas' => 'id_civitas',
             'histori-status' => 'id_histori_status',
-            'periode_award' => 'id_periode', // Primary key untuk tabel periode
-            'rangekunjungan_award' => 'id_range_kunjungan', // Primary key untuk tabel range kunjungan
-            'reward_award' => 'id_reward', // Primary key untuk tabel reward
-            'pembobotan_award' => 'id_pembobotan', // Primary key untuk tabel pembobotan
+            'periode_award' => 'id_periode',
+            'periode' => 'id_periode', // Endpoint API untuk periode
+            'rangekunjungan_award' => 'id_range_kunjungan',
+            'range-kunjungan' => 'id_range_kunjungan', // Endpoint API untuk range kunjungan
+            'reward_award' => 'id_reward',
+            'reward' => 'id_reward', // Endpoint API untuk reward
+            'pembobotan_award' => 'id_pembobotan',
+            'pembobotan' => 'id_pembobotan', // Endpoint API untuk pembobotan
+            'pematerikegiatan_pust' => 'id_pemateri', // Untuk getNextId dari PemateriController
+            'pemateri' => 'id_pemateri',           // Endpoint API untuk pemateri
+            'perusahaan_pemateri_pust' => 'id_perusahaan', // Untuk getNextId dari PemateriController
+            'perusahaan-pemateri' => 'id_perusahaan', // Endpoint API untuk perusahaan pemateri
             'default' => 'id',
         ];
     }
@@ -53,7 +61,6 @@ class MyApiService
 
     public function getPrimaryKeyName(string $endpointName): string
     {
-        // Bersihkan nama endpoint jika mengandung path, misal 'api/periode' menjadi 'periode'
         $cleanedEndpointName = last(explode('/', strtolower($endpointName)));
         return $this->primaryKeyMap[$cleanedEndpointName] ?? $this->primaryKeyMap['default'];
     }
@@ -101,78 +108,57 @@ class MyApiService
 
     public function getNextId(string $endpoint, string $idColumnName = null, int $defaultId = 1): ?int
     {
-        // Jika idColumnName tidak disediakan, coba ambil dari primaryKeyMap
         if ($idColumnName === null) {
             $idColumnName = $this->getPrimaryKeyName($endpoint);
         }
-
         try {
             Log::info("[SERVICE_GET_NEXT_ID] Fetching next ID for endpoint: {$endpoint}, column: {$idColumnName}");
-            
-            $apiResponse = null;
-            $rawHttpResponse = null; 
-
-            // Panggil GET langsung ke endpoint untuk mendapatkan semua data
-            // Asumsi endpoint ini mengembalikan list semua item dari tabel terkait
             $rawHttpResponse = $this->httpClient->get($endpoint); 
             $apiResponse = $this->handleResponse($rawHttpResponse, "[SERVICE_GET_NEXT_ID] Gagal mengambil data dari API {$endpoint} untuk getNextId");
 
             if (!$apiResponse || isset($apiResponse['_error'])) {
                 $statusErrorCode = $apiResponse['_status'] ?? ($rawHttpResponse ? $rawHttpResponse->status() : null);
                 if ($statusErrorCode == 404) {
-                    Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} mengembalikan 404 (Not Found). Ini dianggap sebagai 'belum ada data'. Memulai ID dari {$defaultId}.");
+                    Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} mengembalikan 404 (Not Found). Memulai ID dari {$defaultId}.");
                     return $defaultId;
                 }
-                Log::error("[SERVICE_GET_NEXT_ID] Error saat mengambil data dari API {$endpoint} untuk kalkulasi next ID (bukan 404).", $apiResponse ?? ['raw_status' => $statusErrorCode]);
+                Log::error("[SERVICE_GET_NEXT_ID] Error saat mengambil data dari API {$endpoint} (bukan 404).", $apiResponse ?? ['raw_status' => $statusErrorCode]);
                 return null;
             }
-
-            // Jika API mengembalikan data dalam key 'data'
-            $itemsToIterate = $apiResponse;
-            if (isset($apiResponse['data']) && is_array($apiResponse['data'])) {
-                $itemsToIterate = $apiResponse['data'];
-            } elseif (is_array($itemsToIterate) && count($itemsToIterate) > 0 && !is_array(current($itemsToIterate)) && !isset($itemsToIterate[0])) {
-                 // Kondisi ini mencoba mendeteksi jika $itemsToIterate adalah array asosiatif tunggal (objek JSON tunggal)
-                 // bukan array dari objek. Jika ya, ini bukan list untuk diiterasi.
-                 Log::warning("[SERVICE_GET_NEXT_ID] Respons dari {$endpoint} bukan array dari item (mungkin objek tunggal). Menganggap belum ada data, memulai ID dari {$defaultId}.");
+            $itemsToIterate = $apiResponse['data'] ?? $apiResponse;
+            if (is_array($itemsToIterate) && count($itemsToIterate) > 0 && !is_array(current($itemsToIterate)) && !isset($itemsToIterate[0])) {
+                 Log::warning("[SERVICE_GET_NEXT_ID] Respons dari {$endpoint} bukan array dari item. Memulai ID dari {$defaultId}.");
                  return $defaultId;
             }
-
-
             if (isset($apiResponse['_success_no_content']) || (is_array($itemsToIterate) && empty($itemsToIterate))) {
-                Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} mengembalikan data kosong atau no content. Memulai ID dari {$defaultId}.");
+                Log::info("[SERVICE_GET_NEXT_ID] Endpoint {$endpoint} mengembalikan data kosong. Memulai ID dari {$defaultId}.");
                 return $defaultId;
             }
-
             if (is_array($itemsToIterate)) {
                 $maxId = 0;
                 foreach ($itemsToIterate as $item) {
-                    if (!is_array($item) && !is_object($item)) continue; // Lewati jika item bukan array atau objek
+                    if (!is_array($item) && !is_object($item)) continue;
                     $itemObject = (object) $item;
                     $currentId = null;
-                    // Memastikan $idColumnName selalu ada di $possibleIdKeys
                     $possibleIdKeys = array_unique([strtolower($idColumnName), $idColumnName, strtoupper($idColumnName), 'id', 'ID']);
-
                     foreach($possibleIdKeys as $key) {
                         if (property_exists($itemObject, $key) && is_numeric($itemObject->{$key})) {
                             $currentId = (int) $itemObject->{$key};
                             break;
                         }
                     }
-                    if ($currentId !== null && $currentId > $maxId) {
-                        $maxId = $currentId;
-                    }
+                    if ($currentId !== null && $currentId > $maxId) { $maxId = $currentId; }
                 }
                 $nextId = $maxId + 1;
-                Log::info("[SERVICE_GET_NEXT_ID] Max ID ditemukan: {$maxId}, Next ID: {$nextId} untuk {$endpoint}");
+                Log::info("[SERVICE_GET_NEXT_ID] Max ID: {$maxId}, Next ID: {$nextId} untuk {$endpoint}");
                 return $nextId;
             } else {
-                Log::error("[SERVICE_GET_NEXT_ID] Data dari API {$endpoint} bukan array atau format tidak dikenal setelah pengecekan.", ['response_body' => $apiResponse]);
+                Log::error("[SERVICE_GET_NEXT_ID] Data dari API {$endpoint} bukan array.", ['response_body' => $apiResponse]);
             }
         } catch (\Exception $e) {
-            Log::error("[SERVICE_GET_NEXT_ID] Exception saat mengambil data dari API {$endpoint}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Log::error("[SERVICE_GET_NEXT_ID] Exception di API {$endpoint}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
         }
-        Log::warning("[SERVICE_GET_NEXT_ID] Gagal mendapatkan ID berikutnya dari API untuk {$endpoint}. Menggunakan fallback null.");
+        Log::warning("[SERVICE_GET_NEXT_ID] Gagal mendapatkan ID berikutnya dari API {$endpoint}. Fallback ke null.");
         return null;
     }
 
@@ -183,7 +169,6 @@ class MyApiService
     public function createPeriode(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('periode', $data), 'Gagal membuat periode');
     }
-    // Metode update dan delete periode bisa ditambahkan jika perlu, mengikuti pola ControllerPeriode
 
     // --- Metode untuk endpoint RANGEKUNJUNGAN_AWARD ---
     public function getRangeKunjunganList(array $params = []): ?array {
@@ -207,6 +192,31 @@ class MyApiService
     }
     public function createPembobotan(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('pembobotan', $data), 'Gagal membuat pembobotan');
+    }
+
+    // --- Metode untuk endpoint PEMATERI ---
+    public function getPemateriList(array $params = []): ?array {
+        // Pastikan endpoint 'pemateri' sudah ada di routes/api.php Anda
+        return $this->handleResponse($this->httpClient->get('pemateri', $params), 'Gagal mengambil daftar pemateri');
+    }
+
+    public function createPemateri(array $data): ?array {
+        // Pastikan endpoint 'pemateri' (POST) sudah ada di routes/api.php Anda
+        // dan Controller API yang sesuai menangani penyimpanan ke PEMATERIKEGIATAN_PUST
+        Log::info('[MyApiService] createPemateri data:', $data);
+        return $this->handleResponse($this->httpClient->asJson()->post('pemateri', $data), 'Gagal membuat pemateri');
+    }
+
+    // --- Metode untuk endpoint PERUSAHAAN PEMATERI ---
+    public function getPerusahaanPemateriList(array $params = []): ?array { // Jika Anda perlu mengambil list perusahaan
+        return $this->handleResponse($this->httpClient->get('perusahaan-pemateri', $params), 'Gagal mengambil daftar perusahaan pemateri');
+    }
+
+    public function createPerusahaanPemateri(array $data): ?array {
+        // Pastikan endpoint 'perusahaan-pemateri' (POST) sudah ada di routes/api.php Anda
+        // dan Controller API yang sesuai menangani penyimpanan ke PERUSAHAAN_PEMATERI_PUST
+        Log::info('[MyApiService] createPerusahaanPemateri data:', $data);
+        return $this->handleResponse($this->httpClient->asJson()->post('perusahaan-pemateri', $data), 'Gagal membuat perusahaan pemateri');
     }
 
 
@@ -234,8 +244,11 @@ class MyApiService
         return $this->handleResponse($this->httpClient->delete("jadwal-kegiatan/{$id}"), "Gagal menghapus jadwal kegiatan ID: {$id}");
     }
 
+    // getPemateriKegiatanList sebelumnya mungkin merujuk ke tabel relasi, 
+    // sedangkan getPemateriList yang baru adalah untuk master pemateri.
+    // Saya akan membiarkan yang lama jika masih digunakan di tempat lain.
     public function getPemateriKegiatanList(array $params = []): ?array {
-        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri kegiatan');
+        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri kegiatan (relasi)');
     }
 
     public function getSertifikatList(array $params = []): ?array {

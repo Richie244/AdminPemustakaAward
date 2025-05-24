@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\KegiatanController;
 use App\Http\Controllers\SertifikatTemplateController;
+use App\Http\Controllers\PemateriController;
 use App\Http\Controllers\AksaraController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\SertifikatGeneratorController;
@@ -42,6 +43,12 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
         'kegiatan' => 'id' 
     ]); 
     Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
+
+    // Contoh routes untuk Master Pemateri
+    Route::get('/master-pemateri', [PemateriController::class, 'index'])->name('master-pemateri.index');
+    Route::get('/master-pemateri/create', [PemateriController::class, 'create'])->name('master-pemateri.create');
+    Route::post('/master-pemateri', [PemateriController::class, 'store'])->name('master-pemateri.store');
+    // Tambahkan route untuk edit, update, delete jika perlu
 
     // --- Route Periode ---
     Route::get('/periode', [App\Http\Controllers\PeriodeController::class, 'index'])->name('periode.index'); 

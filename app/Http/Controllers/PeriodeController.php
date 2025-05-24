@@ -17,21 +17,23 @@ class PeriodeController extends Controller
     protected MyApiService $apiService;
 
     protected array $jenisRangeMapping = [
-        'kunjungan' => 1,
-        'pinjaman' => 2,
+        'kunjungan' => 1, // Asumsi ID 1 untuk Kunjungan Harian di tabel JENISRANGE_AWARD
+        'pinjaman' => 2,  // Asumsi ID 2 untuk Peminjaman Buku di tabel JENISRANGE_AWARD
     ];
 
+    // Kunci di sini harus konsisten dengan yang digunakan di form dan untuk validasi
     protected array $jenisBobotMapping = [
-        'bobot_level_satu'       => 1,
-        'bobot_level_dua'        => 2,
-        'bobot_level_tiga'       => 3,
-        'maks_kunjungan'         => 4,
-        'maks_pinjaman'          => 5,
-        'maks_aksara_dinamika'   => 6,
-        'maks_kegiatan'          => 7,
-        'bobot_aksara_dinamika'  => 8,
+        'bobot_level_satu'       => 1, // ID_JENIS_BOBOT = 1 (Untuk Skor Minimal Reward Level 1)
+        'bobot_level_dua'        => 2, // ID_JENIS_BOBOT = 2 (Untuk Skor Minimal Reward Level 2)
+        'bobot_level_tiga'       => 3, // ID_JENIS_BOBOT = 3 (Untuk Skor Minimal Reward Level 3)
+        'maks_kunjungan'         => 4, // ID_JENIS_BOBOT = 4
+        'maks_pinjaman'          => 5, // ID_JENIS_BOBOT = 5
+        'maks_aksara_dinamika'   => 6, // ID_JENIS_BOBOT = 6
+        'maks_kegiatan'          => 7, // ID_JENIS_BOBOT = 7
+        'bobot_aksara_dinamika'  => 8, // ID_JENIS_BOBOT = 8
     ];
 
+    // Ini adalah array yang akan kita kirim ke view
     protected array $namaJenisBobot = [
         1 => 'Skor Minimal Reward Level 1',
         2 => 'Skor Minimal Reward Level 2',
@@ -49,6 +51,9 @@ class PeriodeController extends Controller
         $this->apiService = $apiService;
     }
 
+    /**
+     * Helper function to check API call success.
+     */
     private function isApiCallSuccessful($result, string $idKeyToCheck = 'id', string $endpointNameForLog = ''): bool
     {
         if (!$result || isset($result['_error'])) {
@@ -65,6 +70,7 @@ class PeriodeController extends Controller
         Log::warning("[API_CALL_NO_CLEAR_SUCCESS_INDICATOR] Endpoint: {$endpointNameForLog}", ['result' => $result]);
         return false; 
     }
+
 
     public function index(Request $request)
     {
@@ -92,28 +98,42 @@ class PeriodeController extends Controller
                         return $periodeObj; 
                     })->filter(fn ($periode) => $periode->ID_PERIODE !== null);
                 }
+                 Log::info('[PERIODE_INDEX] Data periode mentah dari API (setelah map dan filter null ID):', $allPeriodes->toArray());
             } elseif ($apiResponse && isset($apiResponse['_error'])) {
+                Log::error('[PERIODE_INDEX] API Error saat mengambil daftar periode.', $apiResponse);
                 $error = $apiResponse['_json_error_data']['message'] ?? ($apiResponse['_body'] ?? 'Gagal memuat data periode dari API.');
             } else {
-                if(!(is_array($apiResponse) && empty($apiResponse) && !isset($apiResponse['_error']))){ $error = 'Tidak ada data periode atau respons API tidak valid.'; }
+                Log::warning('[PERIODE_INDEX] Respons tidak valid atau kosong dari API getPeriodeList.', (array)$apiResponse);
+                if(!(is_array($apiResponse) && empty($apiResponse) && !isset($apiResponse['_error']))){
+                     $error = 'Tidak ada data periode atau respons API tidak valid.';
+                }
             }
+
             if ($searchTerm && $allPeriodes instanceof Collection) {
                 $allPeriodes = $allPeriodes->filter(fn ($periode) => isset($periode->NAMA_PERIODE) && stripos($periode->NAMA_PERIODE, $searchTerm) !== false);
             }
+
             if ($sortBy && $allPeriodes instanceof Collection && $allPeriodes->isNotEmpty()) {
                 [$sortField, $sortDirection] = explode('_', $sortBy, 2); 
                 $isDescending = ($sortDirection === 'desc'); 
+
                 $allPeriodes = $allPeriodes->sortBy(function ($periode) use ($sortField) {
-                    if ($sortField === 'tgl_mulai') { try { return isset($periode->TGL_MULAI) ? Carbon::parse($periode->TGL_MULAI) : null; } catch (\Exception $e) { return null; }}
+                    if ($sortField === 'tgl_mulai') { try { return isset($periode->TGL_MULAI) ? Carbon::parse($periode->TGL_MULAI) : null; } catch (\Exception $e) { Log::warning("[PERIODE_INDEX] Gagal parse tanggal untuk sorting: " . ($periode->TGL_MULAI ?? 'NULL'), ['id' => ($periode->ID_PERIODE ?? 'N/A')]); return null; }}
                     if ($sortField === 'nama') { return strtolower($periode->NAMA_PERIODE ?? ''); }
                     return $periode->ID_PERIODE ?? 0; 
                 }, SORT_REGULAR, $isDescending)->values(); 
             }
+             Log::info('[PERIODE_INDEX] Data periode setelah filter dan sort:', $allPeriodes->toArray());
+
             $currentPage = Paginator::resolveCurrentPage() ?: 1;
             $itemsForCurrentPage = ($allPeriodes instanceof Collection) ? $allPeriodes->slice(($currentPage - 1) * $perPage, $perPage) : new Collection();
             $paginatedPeriodes = new LengthAwarePaginator( $itemsForCurrentPage->all(), ($allPeriodes instanceof Collection) ? $allPeriodes->count() : 0, $perPage, $currentPage,
-                ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()]);
-        } catch (\Exception $e) { $error = 'Terjadi kesalahan: ' . $e->getMessage(); }
+                ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()]
+            );
+        } catch (\Exception $e) {
+            Log::error('[PERIODE_INDEX] Exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            $error = 'Terjadi kesalahan saat memuat data periode: ' . $e->getMessage();
+        }
         return view('periode', ['periodes' => $paginatedPeriodes, 'error' => $error]);
     }
 
@@ -157,6 +177,7 @@ class PeriodeController extends Controller
     private function getPeriodeDetailsForForm(string $periodeIdToFetch): array
     {
         $details = ['periode' => null, 'rangesKunjungan' => [], 'rangesPinjaman' => [], 'rewards' => [], 'pembobotans' => new Collection()];
+        
         $apiResponsePeriode = $this->apiService->getPeriodeList();
         if ($apiResponsePeriode && !isset($apiResponsePeriode['_error'])) {
             $allPeriodes = isset($apiResponsePeriode['data']) && is_array($apiResponsePeriode['data']) ? $apiResponsePeriode['data'] : $apiResponsePeriode;
@@ -171,32 +192,40 @@ class PeriodeController extends Controller
             Log::warning("[GET_DETAILS_FORM] Periode utama dengan ID {$periodeIdToFetch} tidak ditemukan.");
             return []; 
         }
-        // Mengambil data dengan filter ID Periode
+
         $apiResponsePembobotans = $this->apiService->getPembobotanList(['id_periode' => $periodeIdToFetch]);
         if ($apiResponsePembobotans && !isset($apiResponsePembobotans['_error'])) {
             $pembobotansData = isset($apiResponsePembobotans['data']) && is_array($apiResponsePembobotans['data']) ? $apiResponsePembobotans['data'] : $apiResponsePembobotans;
-            $details['pembobotans'] = collect($pembobotansData)->map(function($item){ // Tidak perlu filter manual lagi jika API sudah filter
+            $details['pembobotans'] = collect($pembobotansData)->map(function($item){
                 $obj = (object) $item;
                 $obj->ID_JENIS_BOBOT = isset($obj->ID_JENIS_BOBOT) ? (int)($obj->ID_JENIS_BOBOT) : (isset($obj->id_jenis_bobot) ? (int)($obj->id_jenis_bobot) : null);
                 $obj->NILAI = $obj->NILAI ?? $obj->nilai ?? null;
                 return $obj;
             })->filter(fn($pb) => $pb->ID_JENIS_BOBOT !== null)->keyBy('ID_JENIS_BOBOT');
         }
+        
         $apiResponseRewards = $this->apiService->getRewardList(['id_periode' => $periodeIdToFetch]); 
         if ($apiResponseRewards && !isset($apiResponseRewards['_error'])) {
             $rewardsData = isset($apiResponseRewards['data']) && is_array($apiResponseRewards['data']) ? $apiResponseRewards['data'] : $apiResponseRewards;
-            $details['rewards'] = collect($rewardsData)->map(fn($item) => (object)$item)->all(); // Tidak perlu filter manual lagi
+            $details['rewards'] = collect($rewardsData)->map(fn($item) => (object)$item)->all();
         }
+
         $apiResponseRanges = $this->apiService->getRangeKunjunganList(['id_periode' => $periodeIdToFetch]); 
         if ($apiResponseRanges && !isset($apiResponseRanges['_error'])) {
             $rangesData = isset($apiResponseRanges['data']) && is_array($apiResponseRanges['data']) ? $apiResponseRanges['data'] : $apiResponseRanges;
-            foreach (collect($rangesData)->map(fn($item) => (object)$item) as $range) { // Tidak perlu filter manual lagi
+            $filteredRanges = collect($rangesData)->filter(function($rg) use ($periodeIdToFetch){
+                $rgObj = (object) $rg;
+                $rangePeriodeId = $rgObj->ID_PERIODE ?? $rgObj->id_periode ?? null;
+                return (string)$rangePeriodeId === $periodeIdToFetch;
+            });
+            foreach ($filteredRanges->map(fn($item) => (object)$item) as $range) {
                 $idJenisRange = $range->ID_JENIS_RANGE ?? $range->id_jenis_range ?? null;
                 if ($idJenisRange == $this->jenisRangeMapping['kunjungan']) $details['rangesKunjungan'][] = $range;
                 elseif ($idJenisRange == $this->jenisRangeMapping['pinjaman']) $details['rangesPinjaman'][] = $range;
             }
         }
-        Log::info("[GET_DETAILS_FORM] Details for periode {$periodeIdToFetch}:", $details);
+        Log::info("[GET_DETAILS_FORM] Details for periode {$periodeIdToFetch} (Ranges Kunjungan):", $details['rangesKunjungan']);
+        Log::info("[GET_DETAILS_FORM] Details for periode {$periodeIdToFetch} (Ranges Pinjaman):", $details['rangesPinjaman']);
         return $details;
     }
 
@@ -251,7 +280,80 @@ class PeriodeController extends Controller
 
     public function store(Request $request)
     {
-        // ... (Metode store tetap sama seperti sebelumnya) ...
+        Log::info('[PERIODE_STORE_START]', $request->all());
+        $poinKomponenValidationRules = [];
+        $komponenBobotKeysUntukValidasi = array_keys(array_filter($this->jenisBobotMapping, fn($id) => $id >= 4)); 
+        foreach ($komponenBobotKeysUntukValidasi as $key) { $poinKomponenValidationRules['poin_komponen.' . $key] = 'required|numeric|min:0'; }
+        $validator = WebValidator::make($request->all(), array_merge([
+            'nama_periode' => 'required|string|max:100', 'start_date' => 'required|date', 'end_date' => 'required|date|after_or_equal:start_date',
+            'kunjungan_start.*' => 'required_with:kunjungan_end.*,kunjungan_skor.*|nullable|numeric|min:0',
+            'kunjungan_end.*' => 'required_with:kunjungan_start.*,kunjungan_skor.*|nullable|numeric|gte:kunjungan_start.*',
+            'kunjungan_skor.*' => 'required_with:kunjungan_start.*,kunjungan_end.*|nullable|numeric|min:0',
+            'pinjaman_start.*' => 'required_with:pinjaman_end.*,pinjaman_skor.*|nullable|numeric|min:0',
+            'pinjaman_end.*' => 'required_with:pinjaman_start.*,pinjaman_skor.*|nullable|numeric|gte:pinjaman_start.*',
+            'pinjaman_skor.*' => 'required_with:pinjaman_start.*,pinjaman_end.*|nullable|numeric|min:0',
+            'rewards.1.skor_minimal' => 'required|numeric|min:0', 'rewards.2.skor_minimal' => 'required|numeric|min:0', 'rewards.3.skor_minimal' => 'required|numeric|min:0',
+            'rewards.*.nama_reward' => 'required|string|max:50', 'rewards.*.slot_tersedia' => 'required|numeric|min:0',
+        ], $poinKomponenValidationRules));
+        if ($validator->fails()) { return redirect()->route('periode.create')->withErrors($validator)->withInput(); }
+        $errors = new MessageBag(); $createdPeriodeId = null; 
+        $nextPeriodeId = $this->apiService->getNextId('periode', $this->apiService->getPrimaryKeyName('periode_award'));
+        if ($nextPeriodeId === null) { return redirect()->route('periode.create')->with('error', 'Gagal ID Periode.')->withInput(); }
+        $dataPeriode = ['id' => $nextPeriodeId, 'nama' => $request->input('nama_periode'), 'tgl_mulai' => $request->input('start_date'), 'tgl_selesai' => $request->input('end_date')];
+        $resultPeriode = $this->apiService->createPeriode($dataPeriode);
+        if (!$this->isApiCallSuccessful($resultPeriode, $this->apiService->getPrimaryKeyName('periode_award'), 'createPeriode')) {
+            return redirect()->route('periode.create')->with('error', 'Gagal simpan periode: ' . ($resultPeriode['_json_error_data']['message'] ?? ($resultPeriode['message'] ?? ($resultPeriode['_body'] ?? 'Error API'))))->withInput();
+        }
+        $createdPeriodeId = $nextPeriodeId; 
+        Log::info('[PERIODE_STORE_API_SUCCESS] Periode ID: ' . $createdPeriodeId);
+        foreach (['kunjungan', 'pinjaman'] as $type) {
+            if ($request->input("{$type}_start")) {
+                foreach ($request->input("{$type}_start") as $index => $start) {
+                    if (!is_numeric($start) || !isset($request->input("{$type}_end")[$index]) || !isset($request->input("{$type}_skor")[$index])) continue;
+                    $nextRangeId = $this->apiService->getNextId('range-kunjungan', $this->apiService->getPrimaryKeyName('rangekunjungan_award'));
+                    if ($nextRangeId === null) { $errors->add("range_{$type}", "Gagal ID range {$type} ".($index+1)."."); continue; }
+                    $dataRange = ['id' => $nextRangeId, 'id_jenis_range' => $this->jenisRangeMapping[$type], 'id_periode' => $createdPeriodeId, 'range_awal' => $start, 'range_akhir' => $request->input("{$type}_end")[$index], 'bobot' => $request->input("{$type}_skor")[$index]];
+                    $resultRange = $this->apiService->createRangeKunjungan($dataRange);
+                    if (!$this->isApiCallSuccessful($resultRange, $this->apiService->getPrimaryKeyName('rangekunjungan_award'), 'createRangeKunjungan')) {
+                        $errors->add("range_{$type}", "Gagal simpan range {$type} ".($index+1).": " . ($resultRange['_json_error_data']['message'] ?? ($resultRange['message'] ?? ($resultRange['_body'] ?? 'Error API'))));
+                    }
+                }
+            }
+        }
+        if ($request->input('rewards')) {
+            foreach ($request->input('rewards') as $level => $rewardData) {
+                $nextRewardId = $this->apiService->getNextId('reward', $this->apiService->getPrimaryKeyName('reward_award'));
+                if ($nextRewardId === null) { $errors->add('reward', "Gagal ID reward level {$level}."); continue; }
+                $dataReward = ['id' => $nextRewardId, 'idperiode' => $createdPeriodeId, 'level' => $level, 'bentuk' => $rewardData['nama_reward'], 'slot' => $rewardData['slot_tersedia']];
+                $resultReward = $this->apiService->createReward($dataReward);
+                if (!$this->isApiCallSuccessful($resultReward, $this->apiService->getPrimaryKeyName('reward_award'), 'createReward')) { $errors->add('reward', "Gagal simpan reward level {$level}."); continue; }
+                $idJenisBobotForLevel = $this->jenisBobotMapping['bobot_level_satu'] ?? null;
+                if ($level == 2) $idJenisBobotForLevel = $this->jenisBobotMapping['bobot_level_dua'] ?? null;
+                elseif ($level == 3) $idJenisBobotForLevel = $this->jenisBobotMapping['bobot_level_tiga'] ?? null;
+                if ($idJenisBobotForLevel && isset($rewardData['skor_minimal'])) {
+                    $nextPembobotanId = $this->apiService->getNextId('pembobotan', $this->apiService->getPrimaryKeyName('pembobotan_award'));
+                    if ($nextPembobotanId === null) { $errors->add('pembobotan_level_'.$level, "Gagal ID pembobotan skor minimal Level {$level}."); continue; }
+                    $dataPembobotanSkorMinimal = ['id' => $nextPembobotanId, 'id_periode' => $createdPeriodeId, 'id_jenis_bobot' => $idJenisBobotForLevel, 'nilai' => $rewardData['skor_minimal']];
+                    $resultPembobotanSkorMinimal = $this->apiService->createPembobotan($dataPembobotanSkorMinimal);
+                    if (!$this->isApiCallSuccessful($resultPembobotanSkorMinimal, 'id', 'createPembobotanSkorMinimal')) { $errors->add('pembobotan_level_'.$level, "Gagal simpan skor minimal Level {$level}.");}
+                }
+            }
+        }
+        $inputPoinKomponen = $request->input('poin_komponen'); 
+        if ($inputPoinKomponen) { 
+            foreach ($inputPoinKomponen as $key => $nilai) {
+                if (!isset($this->jenisBobotMapping[$key])) { Log::warning("[PERIODE_STORE_WARNING] Kunci jenis bobot tidak dikenal: {$key}"); continue; }
+                $idJenisBobot = $this->jenisBobotMapping[$key];
+                if ($idJenisBobot < 4) continue; 
+                $nextPembobotanId = $this->apiService->getNextId('pembobotan', $this->apiService->getPrimaryKeyName('pembobotan_award'));
+                 if ($nextPembobotanId === null) { $errors->add('pembobotan_komponen', "Gagal ID pembobotan '{$this->namaJenisBobot[$idJenisBobot]}'."); continue; }
+                $dataPembobotan = ['id' => $nextPembobotanId, 'id_periode' => $createdPeriodeId, 'id_jenis_bobot' => $idJenisBobot, 'nilai' => $nilai];
+                $resultPembobotan = $this->apiService->createPembobotan($dataPembobotan);
+                if (!$this->isApiCallSuccessful($resultPembobotan, 'id', 'createPembobotanKomponen')) { $errors->add('pembobotan_komponen', "Gagal simpan pembobotan '{$this->namaJenisBobot[$idJenisBobot]}'.");}
+            }
+        }
+        if ($errors->isNotEmpty()) { return redirect()->route('periode.create')->with('error', 'Beberapa kesalahan terjadi.')->withErrors($errors)->withInput(); }
+        return redirect()->route('periode.index')->with('success', 'Pengaturan periode baru berhasil disimpan.');
     }
 
     public function show(Request $request, $id) 
@@ -274,21 +376,15 @@ class PeriodeController extends Controller
 
             if ($periode) {
                 $pembobotansFromApi = new Collection();
-                // PENTING: Memastikan API dipanggil dengan filter id_periode
                 $apiResponsePembobotans = $this->apiService->getPembobotanList(['id_periode' => $id]); 
                 if ($apiResponsePembobotans && !isset($apiResponsePembobotans['_error'])) {
                     $pembobotansDataFromApi = isset($apiResponsePembobotans['data']) && is_array($apiResponsePembobotans['data']) ? $apiResponsePembobotans['data'] : $apiResponsePembobotans;
-                    // Jika API tidak memfilter berdasarkan id_periode, lakukan filter manual di sini
-                    $pembobotansFromApi = collect($pembobotansDataFromApi)->filter(function($pb) use ($id){
-                        $pbObj = (object) $pb;
-                        return (string)($pbObj->ID_PERIODE ?? $pbObj->id_periode ?? null) === (string)$id;
-                    })->map(function($item){
+                    $pembobotansFromApi = collect($pembobotansDataFromApi)->map(function($item){
                         $obj = (object) $item;
                         $obj->ID_JENIS_BOBOT = isset($obj->ID_JENIS_BOBOT) ? (int)($obj->ID_JENIS_BOBOT) : (isset($obj->id_jenis_bobot) ? (int)($obj->id_jenis_bobot) : null);
                         $obj->NILAI = $obj->NILAI ?? $obj->nilai ?? null;
                         return $obj;
                     })->filter(fn($pb) => $pb->ID_JENIS_BOBOT !== null)->keyBy('ID_JENIS_BOBOT'); 
-                    Log::info("[PERIODE_SHOW] Data Pembobotan (setelah filter manual jika perlu, keyed by ID_JENIS_BOBOT) untuk periode ID {$id}:", $pembobotansFromApi->toArray());
                 } else { Log::warning("[PERIODE_SHOW] Gagal memuat data pembobotan untuk periode ID {$id}.", $apiResponsePembobotans ?? []); }
                 
                 foreach ($this->namaJenisBobot as $idBobot => $namaDeskriptif) {
@@ -301,7 +397,6 @@ class PeriodeController extends Controller
                 }
                 Log::info("[PERIODE_SHOW] Data Pembobotan (untuk view) periode ID {$id}:", $allPembobotansForView);
 
-                // Mengambil dan memfilter REWARD
                 $allRewardsFromApi = [];
                 $apiResponseAllRewards = $this->apiService->getRewardList(); 
                 if ($apiResponseAllRewards && !isset($apiResponseAllRewards['_error'])) {
@@ -329,7 +424,6 @@ class PeriodeController extends Controller
                      $rewards[] = $rewardObj;
                  }
                 
-                // Mengambil dan memfilter RANGE KUNJUNGAN/PINJAMAN
                 $allRangesFromApi = [];
                 $apiResponseAllRanges = $this->apiService->getRangeKunjunganList(); 
                 if ($apiResponseAllRanges && !isset($apiResponseAllRanges['_error'])) {
@@ -339,11 +433,8 @@ class PeriodeController extends Controller
                 $filteredRanges = collect($allRangesFromApi)->filter(function($range) use ($id) {
                     $rangeObj = (object) $range;
                     $rangePeriodeId = $rangeObj->ID_PERIODE ?? $rangeObj->id_periode ?? null;
-                    // Log::debug("[PERIODE_SHOW_RANGE_FILTER] Comparing rangePeriodeId: {$rangePeriodeId} (type: " . gettype($rangePeriodeId) . ") with periodeId: {$id} (type: " . gettype($id) . ")");
                     return (string)$rangePeriodeId === (string)$id;
                 });
-                Log::info("[PERIODE_SHOW] Data Ranges mentah untuk periode ID {$id} (setelah filter manual):", $filteredRanges->toArray());
-
                 foreach ($filteredRanges as $range) {
                     $rangeObj = (object) $range;
                     $idJenisRange = $rangeObj->ID_JENIS_RANGE ?? $rangeObj->id_jenis_range ?? null;

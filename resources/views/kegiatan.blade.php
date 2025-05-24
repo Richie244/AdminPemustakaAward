@@ -1,4 +1,4 @@
-@extends('layouts.app') 
+@extends('layouts.app')
 
 @section('title', 'Daftar Kegiatan')
 @section('page_title', 'Manajemen Kegiatan')
@@ -33,6 +33,13 @@
                         </a>
                         @endif
                     </form>
+
+                    {{-- Tombol Master Pemateri --}}
+                    <a href="{{ route('master-pemateri.index') }}" {{-- Ganti dengan route yang benar untuk master pemateri --}}
+                       class="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M12 7a4 4 0 110 8 4 4 0 010-8z"></path></svg>
+                        Master Pemateri
+                    </a>
 
                     <a href="{{ route('sertifikat-templates.index') }}" 
                        class="bg-teal-500 hover:bg-teal-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center">
@@ -107,7 +114,6 @@
                         <tbody class="divide-y divide-gray-200" x-data="{}">  
                             @foreach ($kegiatan as $index => $k)  
                                 @php 
-                                    // Pastikan $kegiatanId selalu memiliki nilai alphanumeric yang valid untuk Alpine
                                     $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
                                 @endphp
                                 <tr class="hover:bg-gray-50 transition-colors duration-150"> 
@@ -167,7 +173,6 @@
     </div> 
 </div> 
 
-<!-- Modal Components -->
 @foreach ($kegiatan as $index => $k)
     @php 
         $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
@@ -275,3 +280,8 @@
     } 
 </script> 
 @endpush
+```
+
+Saya telah menambahkan tombol "Master Pemateri" di file Blade pada Canvas. Tombol ini sekarang mengarah ke `route('master-pemateri.index')`.
+
+Anda perlu membuat route dan controller yang sesuai untuk menangani halaman "Master Pemateri", di mana Anda bisa mengelola daftar pemateri internal dan eksternal

@@ -176,39 +176,6 @@
                         </div>
                     </div>
 
-                    {{-- Input untuk Template Sertifikat --}}
-                    <div>
-                        <label for="template_sertifikat" class="block text-sm font-medium text-gray-700 mb-1">Template Sertifikat (Opsional)</label>
-                        <input type="file" id="template_sertifikat" name="template_sertifikat"
-                               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                               class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 border border-gray-300 rounded-lg shadow-sm cursor-pointer">
-                        @if($kegiatan->template_sertifikat_file && (property_exists($kegiatan->template_sertifikat_file, 'nama_file') || (is_array($kegiatan->template_sertifikat_file) && isset($kegiatan->template_sertifikat_file['nama_file'])) ) )
-                            @php
-                                $namaFileSertifikat = '';
-                                $pathFileSertifikat = '';
-                                if (is_object($kegiatan->template_sertifikat_file) && property_exists($kegiatan->template_sertifikat_file, 'nama_file')) {
-                                    $namaFileSertifikat = $kegiatan->template_sertifikat_file->nama_file;
-                                    $pathFileSertifikat = asset('storage/sertifikat_templates_kegiatan/' . $namaFileSertifikat);
-                                } elseif (is_array($kegiatan->template_sertifikat_file) && isset($kegiatan->template_sertifikat_file['nama_file'])) {
-                                    $namaFileSertifikat = $kegiatan->template_sertifikat_file['nama_file'];
-                                    $pathFileSertifikat = asset('storage/sertifikat_templates_kegiatan/' . $namaFileSertifikat);
-                                }
-                            @endphp
-                            @if($namaFileSertifikat)
-                            <p class="mt-1 text-xs text-gray-500">File saat ini:
-                                <a href="{{ $pathFileSertifikat }}" target="_blank" class="text-blue-500 hover:underline">
-                                    {{ $namaFileSertifikat }}
-                                </a>
-                                (Biarkan kosong jika tidak ingin mengubah)
-                            </p>
-                            @else
-                             <p class="mt-1 text-xs text-gray-500">Belum ada template sertifikat. Format yang didukung: PDF, DOC, DOCX, JPG, PNG. Maksimal 2MB.</p>
-                            @endif
-                        @else
-                            <p class="mt-1 text-xs text-gray-500">Belum ada template sertifikat. Format yang didukung: PDF, DOC, DOCX, JPG, PNG. Maksimal 2MB.</p>
-                        @endif
-                    </div>
-
                     {{-- Keterangan Umum Kegiatan --}}
                     <div>
                         <label for="keterangan_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Keterangan Umum Kegiatan</label>
@@ -273,8 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Name of select changed to sesi[${sesiIdx}][id_pemateri] (no more array for pemateri_ids)
-        // Removed the "Hapus Pemateri Ini" button from here
         return `
             <select name="sesi[${sesiIdx}][id_pemateri]" required
                     class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
@@ -282,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </select>
         `;
     }
-    
+
     function updateSesiNumbers() {
         const sesiItems = sesiContainer.querySelectorAll('.sesi-item');
         sesiItems.forEach((sesi, index) => {
@@ -295,7 +260,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (pemateriLabel && pemateriLabel.textContent.includes('Pemateri Sesi')) {
                  pemateriLabel.textContent = `Pemateri Sesi ${sesiNumber}`;
             }
-            // No "Tambah Pemateri Lagi" button to update per session
         });
     }
 
@@ -336,7 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div id="pemateri-container-${currentIndex}" class="space-y-2">
                         ${createPemateriSelectHtml(currentIndex)}
                     </div>
-                    {{-- Removed "Tambah Pemateri Lagi untuk Sesi Ini" button --}}
                 </div>
             </div>
         `;
@@ -350,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (btn.classList.contains('add-sesi')) {
             addSesiField();
         } else if (btn.classList.contains('remove-sesi')) {
-            if (sesiContainer.querySelectorAll('.sesi-item').length > 1 || 
+            if (sesiContainer.querySelectorAll('.sesi-item').length > 1 ||
                 (sesiContainer.querySelectorAll('.sesi-item').length === 1 && !sesiContainer.querySelector('.sesi-item').hasAttribute('data-loaded-from-db'))) {
                 btn.closest('.sesi-item').remove();
                 updateSesiNumbers();
@@ -358,15 +321,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Minimal harus ada satu sesi kegiatan.');
             }
         }
-        // Removed event listeners for 'add-pemateri-sesi' and 'remove-pemateri-item'
     });
 
     if (sesiContainer.children.length === 0) {
         addSesiField();
     } else {
+        // Tandai sesi yang sudah ada dari database
         sesiContainer.querySelectorAll('.sesi-item').forEach(item => item.setAttribute('data-loaded-from-db', 'true'));
     }
-    updateSesiNumbers(); 
+    updateSesiNumbers();
 });
 </script>
 @endsection
