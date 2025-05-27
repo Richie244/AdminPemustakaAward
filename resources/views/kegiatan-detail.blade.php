@@ -23,7 +23,6 @@
                     <h1 class="text-3xl font-bold text-gray-800 mb-1">{{ $kegiatan->judul_kegiatan ?? ($kegiatan->JUDUL_KEGIATAN ?? 'Judul Tidak Tersedia') }}</h1>
                     <p class="text-sm text-gray-500">ID Kegiatan: {{ $kegiatan->id_kegiatan ?? ($kegiatan->ID_KEGIATAN ?? 'N/A') }}</p>
                 </div>
-                {{-- Anda bisa menambahkan status kegiatan di sini jika ada fieldnya --}}
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
@@ -39,14 +38,42 @@
                     <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Keterangan</h3>
                     <p class="text-gray-700 whitespace-pre-wrap">{{ $kegiatan->keterangan ?? ($kegiatan->KETERANGAN ?? '-') }}</p>
                 </div>
-                 {{-- PERUBAHAN: Menggunakan $kegiatan->template_sertifikat_file --}}
-                @if(isset($kegiatan->template_sertifikat_file) && $kegiatan->template_sertifikat_file && property_exists($kegiatan->template_sertifikat_file, 'nama_file'))
+                
+                {{-- Menampilkan Template Sertifikat Global yang Digunakan --}}
+                @if(isset($templateSertifikatGlobal) && $templateSertifikatGlobal && property_exists($templateSertifikatGlobal, 'nama_file'))
                 <div class="md:col-span-2">
-                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Template Sertifikat</h3>
-                    {{-- Asumsi file disimpan di storage/app/public/sertifikat_templates_kegiatan --}}
-                    <a href="{{ asset('storage/sertifikat_templates_kegiatan/' . $kegiatan->template_sertifikat_file->nama_file) }}" target="_blank" class="text-blue-600 hover:underline">
-                        {{ $kegiatan->template_sertifikat_file->nama_file }}
-                    </a>
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Template Sertifikat Global yang Digunakan</h3>
+                    <div class="flex items-center gap-4">
+                        <a href="{{ Storage::url('templates_sertifikat/' . $templateSertifikatGlobal->nama_file) }}" target="_blank" class="text-blue-600 hover:underline">
+                            {{ $templateSertifikatGlobal->nama_file }}
+                        </a>
+                        @php
+                            // Ambil NIM contoh. Bisa dari peserta pertama yang hadir jika ada, atau NIM dummy.
+                            $contohNim = '000000'; // NIM Dummy default
+                            $nimPesertaPertama = null;
+                            if($kegiatan->jadwal->isNotEmpty()){
+                                foreach($kegiatan->jadwal as $jadwalSesi){
+                                    if (isset($jadwalSesi->kehadiran) && $jadwalSesi->kehadiran->isNotEmpty()) {
+                                        $nimPesertaPertama = $jadwalSesi->kehadiran->first();
+                                        break;
+                                    }
+                                }
+                            }
+                            if($nimPesertaPertama) {
+                                $contohNim = $nimPesertaPertama;
+                            }
+                        @endphp
+                        <a href="{{ route('sertifikat.generate.peserta', ['idKegiatan' => ($kegiatan->id_kegiatan ?? $kegiatan->ID_KEGIATAN), 'nim' => $contohNim, 'peran' => 'PESERTA']) }}" 
+                           target="_blank"
+                           class="px-3 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors">
+                            Lihat Contoh Sertifikat
+                        </a>
+                    </div>
+                </div>
+                @else
+                <div class="md:col-span-2">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Template Sertifikat Global</h3>
+                    <p class="text-gray-500">Template sertifikat global tidak ditemukan atau belum diatur.</p>
                 </div>
                 @endif
             </div>
@@ -79,7 +106,8 @@
                                 </div>
                                 @if(property_exists($jadwal, 'id_pemateri') && $jadwal->id_pemateri != 0)
                                     @php
-                                        $namaPemateriJadwal = $kegiatan->pemateri->firstWhere('id_pemateri', $jadwal->id_pemateri)->nama_pemateri ?? 'Pemateri Tidak Ditemukan';
+                                        $pemateriSesiIni = $kegiatan->pemateri->firstWhere('id_pemateri', $jadwal->id_pemateri);
+                                        $namaPemateriJadwal = $pemateriSesiIni ? ($pemateriSesiIni->nama_pemateri ?? 'Pemateri Tidak Ditemukan') : 'Pemateri Tidak Ditemukan';
                                     @endphp
                                      @if($namaPemateriJadwal !== 'Pemateri Tidak Ditemukan')
                                     <div>

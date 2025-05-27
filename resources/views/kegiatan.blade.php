@@ -10,7 +10,7 @@
 @endpush
 
 @section('content') 
-<div class="min-h-screen pt-2 pb-8 px-2"> 
+<div class="min-h-screen pt-2 pb-8 px-2" x-data="{ showKegiatanReportModal: false }"> 
     <div>  
         <div class="bg-white p-6 shadow-lg rounded-xl overflow-hidden"> 
             <div class="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200 gap-4"> 
@@ -33,9 +33,16 @@
                         </a>
                         @endif
                     </form>
+                    
+                    {{-- Tombol Report PDF Kegiatan --}}
+                    <button @click="showKegiatanReportModal = true"
+                       class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625a1.875 1.875 0 00-1.875 1.875v17.25a1.875 1.875 0 001.875 1.875h12.75a1.875 1.875 0 001.875-1.875V11.25a9 9 0 00-9-9z"></path></svg>
+                        Report PDF
+                    </button>
 
                     {{-- Tombol Master Pemateri --}}
-                    <a href="{{ route('master-pemateri.index') }}" {{-- Ganti dengan route yang benar untuk master pemateri --}}
+                    <a href="{{ route('master-pemateri.index') }}"
                        class="bg-purple-500 hover:bg-purple-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M12 7a4 4 0 110 8 4 4 0 010-8z"></path></svg>
                         Master Pemateri
@@ -57,6 +64,7 @@
                 </div>
             </div> 
 
+            {{-- (Notifikasi dan tabel tetap sama) --}}
             @if(session('success'))
                 <div class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md" role="alert">
                     <p class="font-bold">Sukses!</p>
@@ -111,7 +119,7 @@
                                 <th scope="col" class="px-6 py-3 text-center text-sm font-semibold text-gray-600">Aksi</th> 
                             </tr> 
                         </thead> 
-                        <tbody class="divide-y divide-gray-200" x-data="{}">  
+                        <tbody class="divide-y divide-gray-200">  
                             @foreach ($kegiatan as $index => $k)  
                                 @php 
                                     $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
@@ -170,83 +178,132 @@
                 </div>  
             @endif 
         </div>  
-    </div> 
-</div> 
+    </div>
 
-@foreach ($kegiatan as $index => $k)
-    @php 
-        $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
-    @endphp
-    @if($k->jadwal->isNotEmpty())
-        <div x-data="{ 
-                show: false, 
-                id: '{{ $kegiatanIdAlpine }}' 
-            }" 
-            x-show="show" 
-            x-on:open-modal.window="if ($event.detail.id === id) { show = true }" 
-            x-on:close-modal.window="if ($event.detail.id === id) { show = false }" 
-            x-on:keydown.escape.window="show = false" 
-            x-cloak
-            x-transition:enter="ease-out duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="ease-in duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-            <div @click.outside="show = false" 
-                 x-transition
-                 class="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold text-gray-800">Kode Presensi: {{ $k->judul_kegiatan ?? ($k->JUDUL_KEGIATAN ?? '-') }}</h3>
-                    <button @click="show = false" class="text-gray-400 hover:text-gray-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
+    {{-- Modal Report PDF Kegiatan --}}
+    <div x-show="showKegiatanReportModal" 
+        x-cloak 
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <div @click.outside="showKegiatanReportModal = false" 
+             x-transition
+             class="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-semibold text-gray-800">Filter Laporan Kegiatan</h3>
+                <button @click="showKegiatanReportModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <form action="{{ route('report.kegiatan.pdf') }}" method="GET" target="_blank">
+                <input type="hidden" name="search" value="{{ $searchTerm ?? '' }}">
                 <div class="space-y-4">
-                    @forelse($k->jadwal as $jadwalIndex => $jadwalSesi)
-                        @if(property_exists($jadwalSesi, 'kode_random') && !empty($jadwalSesi->kode_random))
-                        <div class="p-3 border rounded-md bg-gray-50 flex justify-between items-center">
-                            <div>
-                                <p class="text-sm text-gray-500">
-                                    Sesi {{ $jadwalIndex + 1 }}: 
-                                    {{ property_exists($jadwalSesi, 'tgl_kegiatan') ? \Carbon\Carbon::parse($jadwalSesi->tgl_kegiatan)->translatedFormat('d M Y') : '' }}
-                                    @if(property_exists($jadwalSesi, 'waktu_mulai'))
-                                        ({{ \Carbon\Carbon::parse($jadwalSesi->waktu_mulai)->format('H:i') }})
-                                    @endif
-                                </p>
-                                <p class="text-lg font-mono font-semibold text-indigo-600" id="kodePresensi-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}">
-                                    {{ $jadwalSesi->kode_random }}
-                                </p>
-                            </div>
-                            <button onclick="salinKodePresensi('{{ $jadwalSesi->kode_random }}', 'copyBtnText-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}')" 
-                                    class="copy-button bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs inline-flex items-center gap-1">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                <span id="copyBtnText-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}">Salin</span>
-                            </button>
-                        </div>
-                        @endif
-                    @empty
-                        <p class="text-gray-500 text-sm">Tidak ada kode presensi tersedia untuk sesi di kegiatan ini.</p>
-                    @endforelse
-                    @if($k->jadwal->isNotEmpty() && $k->jadwal->filter(fn($j) => property_exists($j, 'kode_random') && !empty($j->kode_random))->isEmpty())
-                        <p class="text-gray-500 text-sm">Tidak ada kode presensi pada sesi manapun untuk kegiatan ini.</p>
-                    @endif
+                    <div>
+                        <label for="start_date_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai Sesi Kegiatan</label>
+                        <input type="date" name="start_date_kegiatan" id="start_date_kegiatan"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 py-2 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label for="end_date_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai Sesi Kegiatan</label>
+                        <input type="date" name="end_date_kegiatan" id="end_date_kegiatan"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 py-2 px-3 text-sm">
+                    </div>
                 </div>
-                <div class="mt-6 text-right">
-                    <button @click="show = false" 
-                            class="px-5 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-150">
-                        Tutup
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="showKegiatanReportModal = false" 
+                            class="px-5 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none transition-colors">
+                        Batal
                     </button>
+                    <button type="submit" 
+                            class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none transition-colors">
+                        Cetak PDF
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Modal Kode Presensi (AlpineJS) --}}
+    @foreach ($kegiatan as $index => $k)
+        @php 
+            $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
+        @endphp
+        @if($k->jadwal->isNotEmpty())
+            <div x-data="{ 
+                    show: false, 
+                    id: '{{ $kegiatanIdAlpine }}' 
+                }" 
+                x-show="show" 
+                x-on:open-modal.window="if ($event.detail.id === id) { show = true }" 
+                x-on:close-modal.window="if ($event.detail.id === id) { show = false }" 
+                x-on:keydown.escape.window="show = false" 
+                x-cloak
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+                <div @click.outside="show = false" 
+                     x-transition
+                     class="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-gray-800">Kode Presensi: {{ $k->judul_kegiatan ?? ($k->JUDUL_KEGIATAN ?? '-') }}</h3>
+                        <button @click="show = false" class="text-gray-400 hover:text-gray-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        @forelse($k->jadwal as $jadwalIndex => $jadwalSesi)
+                            @if(property_exists($jadwalSesi, 'kode_random') && !empty($jadwalSesi->kode_random))
+                            <div class="p-3 border rounded-md bg-gray-50 flex justify-between items-center">
+                                <div>
+                                    <p class="text-sm text-gray-500">
+                                        Sesi {{ $jadwalIndex + 1 }}: 
+                                        {{ property_exists($jadwalSesi, 'tgl_kegiatan') ? \Carbon\Carbon::parse($jadwalSesi->tgl_kegiatan)->translatedFormat('d M Y') : '' }}
+                                        @if(property_exists($jadwalSesi, 'waktu_mulai'))
+                                            ({{ \Carbon\Carbon::parse($jadwalSesi->waktu_mulai)->format('H:i') }})
+                                        @endif
+                                    </p>
+                                    <p class="text-lg font-mono font-semibold text-indigo-600" id="kodePresensi-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}">
+                                        {{ $jadwalSesi->kode_random }}
+                                    </p>
+                                </div>
+                                <button onclick="salinKodePresensi('{{ $jadwalSesi->kode_random }}', 'copyBtnText-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}')" 
+                                        class="copy-button bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-xs inline-flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                                    <span id="copyBtnText-{{$kegiatanIdAlpine}}-{{$jadwalIndex}}">Salin</span>
+                                </button>
+                            </div>
+                            @endif
+                        @empty
+                            <p class="text-gray-500 text-sm">Tidak ada kode presensi tersedia untuk sesi di kegiatan ini.</p>
+                        @endforelse
+                        @if($k->jadwal->isNotEmpty() && $k->jadwal->filter(fn($j) => property_exists($j, 'kode_random') && !empty($j->kode_random))->isEmpty())
+                            <p class="text-gray-500 text-sm">Tidak ada kode presensi pada sesi manapun untuk kegiatan ini.</p>
+                        @endif
+                    </div>
+                    <div class="mt-6 text-right">
+                        <button @click="show = false" 
+                                class="px-5 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-150">
+                            Tutup
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-    @endif
-@endforeach
+        @endif
+    @endforeach
+</div> 
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script>
+{{-- AlpineJS sudah di-include di layout utama, jadi tidak perlu di sini lagi --}}
+{{-- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script> --}} 
 <script> 
     function salinKodePresensi(kode, buttonTextId) {
         console.log('Mencoba menyalin kode:', kode, 'untuk buttonTextId:', buttonTextId);

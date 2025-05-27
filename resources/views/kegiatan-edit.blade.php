@@ -28,6 +28,13 @@
                     </ul>
                 </div>
             @endif
+             @if(session('warning'))
+                <div class="mb-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-md" role="alert">
+                    <p class="font-bold">Perhatian:</p>
+                    <p>{{ session('warning') }}</p>
+                </div>
+            @endif
+
 
             @php $kegiatanId = $kegiatan->id_kegiatan ?? $kegiatan->ID_KEGIATAN ?? null; @endphp
 
@@ -43,7 +50,7 @@
                     {{-- Judul Kegiatan --}}
                     <div>
                         <label for="judul" class="block text-sm font-medium text-gray-700 mb-1">Judul Kegiatan</label>
-                        <input type="text" id="judul" name="judul" value="{{ old('judul', $kegiatan->judul_kegiatan ?? ($kegiatan->JUDUL_KEGIATAN ?? '')) }}" required maxlength="50"
+                        <input type="text" id="judul" name="judul" value="{{ old('judul', $kegiatan->judul_kegiatan ?? ($kegiatan->JUDUL_KEGIATAN ?? '')) }}" required maxlength="100"
                                placeholder="Masukkan judul kegiatan..."
                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                     </div>
@@ -64,6 +71,8 @@
                                    placeholder="Contoh: Aula Gedung A / Link Zoom" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                         </div>
                     </div>
+                    
+                    {{-- Template Sertifikat Dihapus --}}
 
                     {{-- Sesi Kegiatan Dinamis --}}
                     <div class="p-5 border border-gray-200 rounded-xl bg-gray-50/50">
@@ -78,15 +87,23 @@
                             @php
                                 $oldSesi = old('sesi');
                                 $jadwalKegiatan = $kegiatan->jadwal ?? collect();
+                                // Prioritaskan old input, lalu data dari database
+                                $currentSesiData = $oldSesi ?: $jadwalKegiatan->map(function ($jadwal) {
+                                    return [
+                                        'tanggal' => $jadwal->tgl_kegiatan ? \Carbon\Carbon::parse($jadwal->tgl_kegiatan)->format('Y-m-d') : '',
+                                        'jam_mulai' => $jadwal->waktu_mulai ? \Carbon\Carbon::parse($jadwal->waktu_mulai)->format('H:i') : '',
+                                        'jam_selesai' => $jadwal->waktu_selesai ? \Carbon\Carbon::parse($jadwal->waktu_selesai)->format('H:i') : '',
+                                        'id_pemateri' => $jadwal->id_pemateri ?? null // Ambil id_pemateri dari data jadwal
+                                    ];
+                                })->all();
                             @endphp
 
-                            @if($oldSesi)
-                                {{-- Populate with old input if validation failed --}}
-                                @foreach($oldSesi as $sesiIndex => $sesiData)
+                            @if(!empty($currentSesiData))
+                                @foreach($currentSesiData as $sesiIndex => $sesiData)
                                 <div class="p-4 bg-white border border-gray-300 rounded-lg shadow-sm sesi-item space-y-4" data-sesi-index="{{ $sesiIndex }}">
                                     <div class="flex justify-between items-center">
                                         <h3 class="text-lg font-semibold text-gray-800">Sesi {{ $loop->iteration }}</h3>
-                                        <button type="button" title="Hapus Sesi Ini" class="remove-sesi flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition-colors">
+                                         <button type="button" title="Hapus Sesi Ini" class="remove-sesi flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition-colors">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                         </button>
                                     </div>
@@ -107,71 +124,40 @@
                                     <div class="mt-4">
                                         <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi {{ $loop->iteration }}</label>
                                         @php
-                                            $oldPemateriId = $sesiData['id_pemateri'] ?? (isset($sesiData['pemateri_ids']) && is_array($sesiData['pemateri_ids']) && count($sesiData['pemateri_ids']) > 0 ? $sesiData['pemateri_ids'][0] : null);
+                                            $currentPemateriIdSesiIni = $sesiData['id_pemateri'] ?? null;
                                         @endphp
                                         <select name="sesi[{{ $sesiIndex }}][id_pemateri]" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                                             <option value="">-- Pilih Pemateri --</option>
-                                            @if(isset($masterPemateri) && $masterPemateri->isNotEmpty())
-                                                @foreach($masterPemateri as $pemateriMaster)
-                                                    @php $pemateriMasterId = $pemateriMaster->id_pemateri ?? $pemateriMaster->ID_PEMATERI ?? ''; @endphp
-                                                    <option value="{{ $pemateriMasterId }}" {{ (string)$oldPemateriId == (string)$pemateriMasterId ? 'selected' : '' }}>
-                                                        {{ $pemateriMaster->nama_pemateri ?? $pemateriMaster->NAMA_PEMATERI ?? 'Nama Tidak Tersedia' }}
-                                                    </option>
-                                                @endforeach
-                                            @else
+                                             @if(isset($masterPemateri) && $masterPemateri->where('tipe_pemateri', 'Internal')->count() > 0)
+                                                <optgroup label="Pemateri Internal">
+                                                    @foreach($masterPemateri->where('tipe_pemateri', 'Internal') as $pemateri)
+                                                        @php $pemateriMasterId = $pemateri->id_pemateri ?? $pemateri->ID_PEMATERI ?? ''; @endphp
+                                                        <option value="{{ $pemateriMasterId }}" {{ (string)$currentPemateriIdSesiIni == (string)$pemateriMasterId ? 'selected' : '' }}>
+                                                            {{ $pemateri->nama_pemateri ?? $pemateri->NAMA_PEMATERI ?? 'Internal Tidak Bernama' }}
+                                                        </option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endif
+                                            @if(isset($masterPemateri) && $masterPemateri->where('tipe_pemateri', '!=', 'Internal')->count() > 0)
+                                                <optgroup label="Pemateri Eksternal">
+                                                    @foreach($masterPemateri->where('tipe_pemateri', '!=', 'Internal') as $pemateri)
+                                                         @php $pemateriMasterId = $pemateri->id_pemateri ?? $pemateri->ID_PEMATERI ?? ''; @endphp
+                                                        <option value="{{ $pemateriMasterId }}" {{ (string)$currentPemateriIdSesiIni == (string)$pemateriMasterId ? 'selected' : '' }}>
+                                                            {{ $pemateri->nama_pemateri ?? $pemateri->NAMA_PEMATERI ?? 'Eksternal Tidak Bernama' }}
+                                                            @if(isset($pemateri->nama_perusahaan_display) && $pemateri->nama_perusahaan_display !== '-' && $pemateri->nama_perusahaan_display !== 'Universitas Dinamika')
+                                                                ({{ $pemateri->nama_perusahaan_display }})
+                                                            @endif
+                                                        </option>
+                                                    @endforeach
+                                                </optgroup>
+                                            @endif
+                                            @if(!isset($masterPemateri) || $masterPemateri->isEmpty())
                                                 <option value="" disabled>Tidak ada data master pemateri</option>
                                             @endif
                                         </select>
                                     </div>
                                 </div>
                                 @endforeach
-                            @elseif($jadwalKegiatan->isNotEmpty())
-                                {{-- Populate with existing data from database --}}
-                                @foreach($jadwalKegiatan as $sesiIndex => $jadwal)
-                                <div class="p-4 bg-white border border-gray-300 rounded-lg shadow-sm sesi-item space-y-4" data-sesi-index="{{ $sesiIndex }}">
-                                    <div class="flex justify-between items-center">
-                                        <h3 class="text-lg font-semibold text-gray-800">Sesi {{ $loop->iteration }}</h3>
-                                         <button type="button" title="Hapus Sesi Ini" class="remove-sesi flex-shrink-0 bg-red-500 hover:bg-red-600 text-white p-2 rounded-md transition-colors">
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                        </button>
-                                    </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div>
-                                            <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Sesi</label>
-                                            <input type="date" name="sesi[{{ $sesiIndex }}][tanggal]" value="{{ $jadwal->tgl_kegiatan ? \Carbon\Carbon::parse($jadwal->tgl_kegiatan)->format('Y-m-d') : '' }}" class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-medium text-gray-500 mb-1">Jam Mulai</label>
-                                            <input type="time" name="sesi[{{ $sesiIndex }}][jam_mulai]" value="{{ $jadwal->waktu_mulai ? \Carbon\Carbon::parse($jadwal->waktu_mulai)->format('H:i') : '' }}" class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-medium text-gray-500 mb-1">Jam Selesai</label>
-                                            <input type="time" name="sesi[{{ $sesiIndex }}][jam_selesai]" value="{{ $jadwal->waktu_selesai ? \Carbon\Carbon::parse($jadwal->waktu_selesai)->format('H:i') : '' }}" class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm">
-                                        </div>
-                                    </div>
-                                    <div class="mt-4">
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi {{ $loop->iteration }}</label>
-                                        @php
-                                            $currentJadwalPemateriId = $jadwal->id_pemateri ?? null;
-                                        @endphp
-                                        <select name="sesi[{{ $sesiIndex }}][id_pemateri]" required class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
-                                            <option value="">-- Pilih Pemateri --</option>
-                                            @if(isset($masterPemateri) && $masterPemateri->isNotEmpty())
-                                                @foreach($masterPemateri as $pemateriMaster)
-                                                    @php $pemateriMasterId = $pemateriMaster->id_pemateri ?? $pemateriMaster->ID_PEMATERI ?? ''; @endphp
-                                                    <option value="{{ $pemateriMasterId }}" {{ (string)$currentJadwalPemateriId == (string)$pemateriMasterId ? 'selected' : '' }}>
-                                                        {{ $pemateriMaster->nama_pemateri ?? $pemateriMaster->NAMA_PEMATERI ?? 'Nama Tidak Tersedia' }}
-                                                    </option>
-                                                @endforeach
-                                            @else
-                                                <option value="" disabled>Tidak ada data master pemateri</option>
-                                            @endif
-                                        </select>
-                                    </div>
-                                </div>
-                                @endforeach
-                            @else
-                                {{-- Fallback: JS will add one empty session if no old input and no DB data --}}
                             @endif
                         </div>
                     </div>
@@ -188,19 +174,19 @@
                     <div>
                         <label for="bobot_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Bobot Poin Keseluruhan Kegiatan</label>
                         <input type="number" id="bobot_kegiatan" name="bobot_kegiatan"
-                               value="{{ old('bobot_kegiatan', $kegiatan->bobot_kegiatan ?? ($kegiatan->jadwal->first()->bobot_kegiatan ?? ($kegiatan->jadwal->first()->BOBOT_KEGIATAN ?? ($kegiatan->jadwal->first()->bobot ?? '') ) )) }}" required min="0"
+                               value="{{ old('bobot_kegiatan', $kegiatan->bobot_kegiatan ?? ($kegiatan->jadwal->first()->bobot ?? ($kegiatan->jadwal->first()->BOBOT ?? '') ) ) }}" required min="0"
                                placeholder="Masukkan bobot poin total" class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                     </div>
 
                     {{-- Tombol Aksi --}}
                     <div class="flex flex-col sm:flex-row justify-end gap-4 pt-5 border-t border-gray-200">
-                        <a href="{{ route('kegiatan.index') }}"
+                        <a href="{{ route('kegiatan.show', $kegiatanId) }}"
                            class="w-full sm:w-auto order-2 sm:order-1 text-center bg-gray-100 text-gray-700 border border-gray-300 px-8 py-3 rounded-lg hover:bg-gray-200 font-semibold transition-colors duration-150 text-sm">
                             Batal
                         </a>
                         <button type="submit"
                                 class="w-full sm:w-auto order-1 sm:order-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-10 py-3 rounded-lg shadow-md hover:shadow-lg font-semibold transition-all duration-150 ease-in-out transform hover:scale-105 text-sm">
-                            Simpan Kegiatan
+                            Simpan Perubahan
                         </button>
                     </div>
                 </form>
@@ -213,32 +199,46 @@
 document.addEventListener('DOMContentLoaded', function() {
     const masterPemateriData = @json($masterPemateri ?? collect());
     const sesiContainer = document.getElementById('sesi-container');
-
-    function getNextSesiIndex() {
-        let maxIndex = -1;
-        sesiContainer.querySelectorAll('.sesi-item').forEach(item => {
-            const currentIndex = parseInt(item.dataset.sesiIndex, 10);
-            if (!isNaN(currentIndex) && currentIndex > maxIndex) {
-                maxIndex = currentIndex;
-            }
-        });
-        return maxIndex + 1;
-    }
+    let sesiCounter = {{ count(old('sesi', $kegiatan->jadwal ?? [])) }};
 
     function createPemateriSelectHtml(sesiIdx, selectedPemateriId = null) {
         let optionsHtml = '<option value="">-- Pilih Pemateri --</option>';
-        const pemateriArray = Array.isArray(masterPemateriData) ?
-            masterPemateriData :
-            Object.values(masterPemateriData || {});
+        const pemateriInternal = masterPemateriData.filter(p => p.tipe_pemateri === 'Internal');
+        const pemateriEksternal = masterPemateriData.filter(p => p.tipe_pemateri !== 'Internal');
 
-        pemateriArray.forEach((pemateri) => {
-            const pemateriId = pemateri.id_pemateri || pemateri.ID_PEMATERI;
-            const pemateriNama = pemateri.nama_pemateri || pemateri.NAMA_PEMATERI || 'Nama Tidak Tersedia';
-            if (pemateriId && pemateriNama) {
-                const isSelected = selectedPemateriId && (String(selectedPemateriId) === String(pemateriId));
-                optionsHtml += `<option value="${pemateriId}" ${isSelected ? 'selected' : ''}>${pemateriNama}</option>`;
-            }
-        });
+        if (pemateriInternal.length > 0) {
+            optionsHtml += '<optgroup label="Pemateri Internal">';
+            pemateriInternal.forEach((pemateri) => {
+                const pemateriId = pemateri.id_pemateri || pemateri.ID_PEMATERI;
+                const pemateriNama = pemateri.nama_pemateri || pemateri.NAMA_PEMATERI || 'Internal Tidak Bernama';
+                if (pemateriId && pemateriNama) {
+                    const isSelected = selectedPemateriId && (String(selectedPemateriId) === String(pemateriId));
+                    optionsHtml += `<option value="${pemateriId}" ${isSelected ? 'selected' : ''}>${pemateriNama}</option>`;
+                }
+            });
+            optionsHtml += '</optgroup>';
+        }
+
+        if (pemateriEksternal.length > 0) {
+            optionsHtml += '<optgroup label="Pemateri Eksternal">';
+            pemateriEksternal.forEach((pemateri) => {
+                const pemateriId = pemateri.id_pemateri || pemateri.ID_PEMATERI;
+                const pemateriNama = pemateri.nama_pemateri || pemateri.NAMA_PEMATERI || 'Eksternal Tidak Bernama';
+                const namaPerusahaan = pemateri.nama_perusahaan_display;
+                if (pemateriId && pemateriNama) {
+                    const isSelected = selectedPemateriId && (String(selectedPemateriId) === String(pemateriId));
+                    let displayText = pemateriNama;
+                    if (namaPerusahaan && namaPerusahaan !== '-' && namaPerusahaan !== 'Universitas Dinamika') {
+                        displayText += ` (${namaPerusahaan})`;
+                    }
+                    optionsHtml += `<option value="${pemateriId}" ${isSelected ? 'selected' : ''}>${displayText}</option>`;
+                }
+            });
+            optionsHtml += '</optgroup>';
+        }
+         if (masterPemateriData.length === 0) {
+             optionsHtml += '<option value="" disabled>Tidak ada data master pemateri</option>';
+        }
 
         return `
             <select name="sesi[${sesiIdx}][id_pemateri]" required
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </select>
         `;
     }
-
+    
     function updateSesiNumbers() {
         const sesiItems = sesiContainer.querySelectorAll('.sesi-item');
         sesiItems.forEach((sesi, index) => {
@@ -263,9 +263,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function addSesiField() {
-        const currentIndex = getNextSesiIndex();
+    function addSesiField(populateData = null) {
+        const currentIndex = sesiCounter++; // Gunakan global counter
         const sesiNumber = sesiContainer.querySelectorAll('.sesi-item').length + 1;
+        
+        let selectedPemateriIdForNewSesi = null;
+        if(populateData && populateData.id_pemateri){ // Jika ini data dari DB atau old() yang sudah benar
+            selectedPemateriIdForNewSesi = populateData.id_pemateri;
+        }
 
         const sesiHTML = `
             <div class="p-4 bg-white border border-gray-300 rounded-lg shadow-sm sesi-item space-y-4" data-sesi-index="${currentIndex}">
@@ -281,29 +286,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Tanggal Sesi</label>
-                        <input type="date" name="sesi[${currentIndex}][tanggal]"
-                               class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
+                        <input type="date" name="sesi[${currentIndex}][tanggal]" value="${populateData && populateData.tanggal ? populateData.tanggal : ''}" class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Jam Mulai</label>
-                        <input type="time" name="sesi[${currentIndex}][jam_mulai]"
-                               class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
+                        <input type="time" name="sesi[${currentIndex}][jam_mulai]" value="${populateData && populateData.jam_mulai ? populateData.jam_mulai : ''}" class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm" required>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-gray-500 mb-1">Jam Selesai</label>
-                        <input type="time" name="sesi[${currentIndex}][jam_selesai]"
-                               class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm">
+                        <input type="time" name="sesi[${currentIndex}][jam_selesai]" value="${populateData && populateData.jam_selesai ? populateData.jam_selesai : ''}" class="block w-full rounded-md border-gray-300 shadow-sm py-2 px-3 text-sm">
                     </div>
                 </div>
                 <div class="mt-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Pemateri Sesi ${sesiNumber}</label>
                     <div id="pemateri-container-${currentIndex}" class="space-y-2">
-                        ${createPemateriSelectHtml(currentIndex)}
+                         ${createPemateriSelectHtml(currentIndex, selectedPemateriIdForNewSesi)}
                     </div>
+                    {{-- Tombol tambah pemateri per sesi dihapus --}}
                 </div>
             </div>
         `;
         sesiContainer.insertAdjacentHTML('beforeend', sesiHTML);
+        updateSesiNumbers();
     }
 
     document.addEventListener('click', (e) => {
@@ -323,13 +327,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Jika tidak ada sesi (baik dari old input maupun dari DB), tambahkan satu default
     if (sesiContainer.children.length === 0) {
         addSesiField();
     } else {
-        // Tandai sesi yang sudah ada dari database
-        sesiContainer.querySelectorAll('.sesi-item').forEach(item => item.setAttribute('data-loaded-from-db', 'true'));
+        // Jika ada, pastikan yang dari DB ditandai, dan nomor sesi diupdate
+        sesiContainer.querySelectorAll('.sesi-item').forEach(item => {
+             // Cek apakah item ini hasil render dari server (data DB atau old input)
+             // Jika ya, kita bisa tambahkan atribut untuk menandainya jika perlu,
+             // atau cukup pastikan sesiCounter sudah benar saat inisialisasi.
+            item.setAttribute('data-loaded-from-db', 'true');
+        });
+        updateSesiNumbers();
     }
-    updateSesiNumbers();
 });
 </script>
 @endsection

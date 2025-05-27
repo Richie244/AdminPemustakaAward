@@ -6,7 +6,8 @@
     <title>@yield('title', config('app.name', 'Laravel'))</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/preline@latest/dist/preline.js"></script>
+    {{-- Pastikan Alpine.js dimuat di sini atau di akhir body --}}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,54 +17,29 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        /* Custom scrollbar untuk sidebar jika kontennya panjang (opsional) */
-        .sidebar::-webkit-scrollbar {
-            width: 6px;
-        }
-        .sidebar::-webkit-scrollbar-track {
-            background: #2d3748; /* Warna track sedikit lebih terang dari sidebar bg */
-        }
-        .sidebar::-webkit-scrollbar-thumb {
-            background: #4a5568; /* Warna thumb */
-            border-radius: 3px;
-        }
-        .sidebar::-webkit-scrollbar-thumb:hover {
-            background: #718096;
-        }
-        .sidebar {
-            height: 100vh; /* Pastikan sidebar mengisi tinggi layar */
-            overflow-y: auto; /* Aktifkan scroll jika konten melebihi tinggi */
-        }
-        /* Efek transisi halus untuk item menu */
-        .nav-item {
-            transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, padding-left 0.2s ease-in-out;
-        }
-        .nav-item-active { /* Kelas ini di-override oleh kelas spesifik di link */
-            /* background-color: #4A5568; */
-            /* color: #E2E8F0; */
-        }
-        .nav-item:hover:not(.bg-blue-600) { /* Efek hover hanya untuk item non-aktif (yang tidak memiliki bg-blue-600) */
-            background-color: #2D3748; 
-        }
+        .sidebar::-webkit-scrollbar { width: 6px; }
+        .sidebar::-webkit-scrollbar-track { background: #2d3748; }
+        .sidebar::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 3px; }
+        .sidebar::-webkit-scrollbar-thumb:hover { background: #718096; }
+        .sidebar { height: 100vh; overflow-y: auto; }
+        .nav-item { transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, padding-left 0.2s ease-in-out; }
+        .nav-item:hover:not(.bg-blue-600) { background-color: #2D3748; }
+        [x-cloak] { display: none !important; } /* Pastikan ini ada */
     </style>
-    @stack('styles') {{-- Untuk style spesifik per halaman --}}
+    @stack('styles')
 </head>
 <body class="bg-gray-100">
     <div class="flex h-screen">
-        {{-- Sidebar dengan warna yang lebih gelap dan modern --}}
-        <aside class="fixed top-0 left-0 w-64 h-full bg-slate-800 text-slate-100 p-5 sidebar shadow-lg z-20"> {{-- Naikkan z-index sidebar --}}
-            {{-- Logo atau Nama Aplikasi --}}
+        {{-- Sidebar --}}
+        <aside class="fixed top-0 left-0 w-64 h-full bg-slate-800 text-slate-100 p-5 sidebar shadow-lg z-20">
             <div class="mb-8 text-center">
                 <a href="{{ url('/') }}" class="text-2xl font-bold text-white hover:text-blue-400 transition-colors">
                     Pemustaka Award
                 </a>
             </div>  
-            
             <nav>
                 <ul>
-                    {{-- Item Menu Dashboard (Sebelumnya Report) --}}
                     <li class="mb-3">
-                        {{-- Ganti url('/report') dengan route yang sesuai untuk Dashboard jika sudah ada --}}
                         <a href="{{ url('/dashboard') }}" 
                            class="nav-item flex items-center p-3 rounded-lg group
                                   {{ request()->is('dashboard*') ? 'bg-blue-600 text-white font-semibold shadow-md' : 'hover:bg-slate-700 hover:text-white' }}">
@@ -71,7 +47,6 @@
                             Dashboard
                         </a>
                     </li>
-                    {{-- Item Menu Periode --}}
                     <li class="mb-3">
                         <a href="{{ route('periode.index') }}" 
                            class="nav-item flex items-center p-3 rounded-lg group
@@ -80,7 +55,6 @@
                             Periode
                         </a>
                     </li>
-                    {{-- Item Menu Kegiatan --}}
                     <li class="mb-3">
                         <a href="{{ route('kegiatan.index') }}" 
                            class="nav-item flex items-center p-3 rounded-lg group
@@ -89,7 +63,6 @@
                             Kegiatan
                         </a>
                     </li>
-                    {{-- Item Menu Validasi Aksara Dinamika --}}
                     <li class="mb-3">
                         <a href="{{ route('validasi.aksara.index') }}" 
                            class="nav-item flex items-center p-3 rounded-lg group
@@ -100,8 +73,6 @@
                     </li>
                 </ul>
             </nav>
-
-            {{-- Footer Sidebar (Opsional) --}}
             <div class="mt-auto pt-5 border-t border-slate-700">
                 <p class="text-xs text-slate-500 text-center">
                     &copy; {{ date('Y') }} {{ config('app.name', 'Laravel') }}.
@@ -109,19 +80,13 @@
             </div>
         </aside>
 
-        {{-- ml-64 untuk memberi ruang bagi sidebar fixed --}}
-        <main class="ml-64 flex-1 h-full flex flex-col"> {{-- Tambah flex flex-col --}}
-            
-            {{-- AWAL: App Bar / Header Utama Konten --}}
-            <header class="bg-white shadow-md sticky top-0 z-10"> {{-- Dibuat sticky --}}
+        <main class="ml-64 flex-1 h-full flex flex-col">
+            <header class="bg-white shadow-md sticky top-0 z-10">
                 <div class="max-w-full mx-auto px-6 py-3">
                     <div class="flex items-center justify-between">
-                        {{-- Judul Halaman Dinamis (Opsional, bisa diambil dari @yield('page_title') jika ada) --}}
                         <h1 class="text-xl font-semibold text-gray-700">
-                            @yield('page_title', 'Dashboard') {{-- Default ke Dashboard jika tidak ada judul spesifik --}}
+                            @yield('page_title', 'Dashboard')
                         </h1>
-
-                        {{-- Informasi Pengguna dan Logout --}}
                         @if(session()->has('nama_pengguna'))
                         <div class="flex items-center space-x-3">
                             <span class="text-sm text-gray-600">
@@ -130,7 +95,7 @@
                                     <span class="text-xs text-gray-500">({{ session('status_pengguna') }})</span>
                                 @endif
                             </span>
-                            <form method="POST" action="{{ route('logout') }}"> {{-- Pastikan route 'logout' ada --}}
+                            <form method="POST" action="{{ route('logout') }}">
                                 @csrf
                                 <button type="submit" class="text-sm text-blue-600 hover:text-blue-800 hover:underline focus:outline-none">
                                     Logout
@@ -138,15 +103,11 @@
                             </form>
                         </div>
                         @else
-                           {{-- Opsional: Tampilkan link login jika belum login (seharusnya tidak terjadi jika halaman ini diakses setelah login) --}}
                            <a href="{{ route('login') }}" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Login</a>
                         @endif
                     </div>
                 </div>
             </header>
-            {{-- AKHIR: App Bar / Header Utama Konten --}}
-
-            {{-- Area Konten Utama --}}
             <div class="flex-1 overflow-y-auto bg-gray-100">
                 <div class="py-8 px-6"> 
                     @yield('content')
@@ -155,10 +116,7 @@
         </main>
     </div>
 
-    @stack('scripts') {{-- Untuk script spesifik per halaman --}}
-    <script>
-        // Script untuk Preline UI jika diperlukan di semua halaman
-        // HSStaticMethods.autoInit(); // Jika Anda menggunakan komponen Preline yang butuh init JS
-    </script>
+    @stack('scripts')
+    {{-- <script src="https://unpkg.com/preline@latest/dist/preline.js"></script> --}} {{-- Komentar Preline yang benar --}}
 </body>
 </html>

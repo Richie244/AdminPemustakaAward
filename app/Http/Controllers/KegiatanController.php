@@ -14,10 +14,14 @@ use Illuminate\Support\Str; // Untuk Str::random
 class KegiatanController extends Controller
 {
     protected MyApiService $apiService;
+    protected string $dummyKegiatanIdForTemplate;
+    protected string $globalTemplateNimIdentifier;
 
     public function __construct(MyApiService $apiService)
     {
         $this->apiService = $apiService;
+        $this->dummyKegiatanIdForTemplate = config('app.dummy_kegiatan_id_for_template', '0');
+        $this->globalTemplateNimIdentifier = config('app.global_template_nim_identifier', 'TPLGLB');
     }
 
     protected function paginate(Collection $items, $perPage = 10, $page = null, $options = [])
@@ -39,7 +43,7 @@ class KegiatanController extends Controller
     public function index(Request $request)
     {
         $searchTerm = $request->input('search');
-        $perPage = 10; 
+        $perPage = 10;
         $currentPage = Paginator::resolveCurrentPage('page');
         
         $processedKegiatanList = new Collection();
@@ -57,7 +61,7 @@ class KegiatanController extends Controller
                 $allRawKegiatan = collect($responseKegiatanFromApi)->map(fn($itemArray) => (object) $itemArray);
 
                 foreach ($allRawKegiatan as $rawKegiatanObject) {
-                    $k = clone $rawKegiatanObject; 
+                    $k = clone $rawKegiatanObject;
                     $idKegiatanUtama = $k->id_kegiatan ?? $k->ID_KEGIATAN ?? null;
 
                     if (!$idKegiatanUtama) {
@@ -139,16 +143,80 @@ class KegiatanController extends Controller
         ]);
     }
 
+    private function getProcessedMasterPemateri()
+    {
+        $masterPemateri = new Collection();
+        $error_message_pemateri = null;
+
+        try {
+            $responsePerusahaan = $this->apiService->getPerusahaanPemateriList();
+            $allPerusahaan = new Collection();
+            if ($responsePerusahaan && !isset($responsePerusahaan['_error'])) {
+                $perusahaanDataFromApi = isset($responsePerusahaan['data']) && is_array($responsePerusahaan['data']) ? $responsePerusahaan['data'] : (is_array($responsePerusahaan) ? $responsePerusahaan : []);
+                if (!empty($perusahaanDataFromApi)) {
+                    $allPerusahaan = collect($perusahaanDataFromApi)
+                                    ->map(fn($item) => (object) $item)
+                                    ->filter(fn($p) => isset($p->id_perusahaan) || isset($p->ID_PERUSAHAAN))
+                                    ->keyBy(function($p) {
+                                        return $p->id_perusahaan ?? $p->ID_PERUSAHAAN ?? null;
+                                    });
+                }
+            } else {
+                Log::warning('[GET_MASTER_PEMATERI] Gagal mengambil daftar perusahaan.', $responsePerusahaan ?? []);
+            }
+
+            $responsePemateri = $this->apiService->getPemateriKegiatanList();
+            
+            if ($responsePemateri && !isset($responsePemateri['_error']) && !isset($responsePemateri['_success_no_content'])) {
+                $dataFromApi = isset($responsePemateri['data']) && is_array($responsePemateri['data']) ? $responsePemateri['data'] : (is_array($responsePemateri) ? $responsePemateri : []);
+                
+                if (!empty($dataFromApi)) {
+                    $masterPemateri = collect($dataFromApi)->map(function($item) use ($allPerusahaan) {
+                        $pemateriObj = (object) $item;
+                        $pemateriObj->id_pemateri = $pemateriObj->id_pemateri ?? $pemateriObj->ID_PEMATERI ?? null;
+                        $pemateriObj->nama_pemateri = $pemateriObj->nama_pemateri ?? $pemateriObj->NAMA_PEMATERI ?? 'Nama Tidak Ada';
+                        
+                        $idPerusahaanPemateri = $pemateriObj->id_perusahaan ?? $pemateriObj->ID_PERUSAHAAN ?? null;
+                        $pemateriObj->id_perusahaan_numeric = is_numeric($idPerusahaanPemateri) ? (int)$idPerusahaanPemateri : null;
+
+                        if ($pemateriObj->id_perusahaan_numeric === 1) { 
+                            $pemateriObj->tipe_pemateri = 'Internal';
+                            $pemateriObj->nama_perusahaan_display = 'Universitas Dinamika';
+                        } else if ($pemateriObj->id_perusahaan_numeric !== null && $allPerusahaan->has($pemateriObj->id_perusahaan_numeric)) {
+                            $perusahaan = $allPerusahaan->get($pemateriObj->id_perusahaan_numeric);
+                            $pemateriObj->tipe_pemateri = 'Eksternal';
+                            $pemateriObj->nama_perusahaan_display = $perusahaan->nama_perusahaan ?? 'Perusahaan Tidak Diketahui';
+                        } else {
+                            $pemateriObj->tipe_pemateri = 'Eksternal (Individu)';
+                            $pemateriObj->nama_perusahaan_display = '-';
+                        }
+                        return $pemateriObj;
+                    });
+                }
+            } elseif ($responsePemateri && isset($responsePemateri['_error'])) {
+                $error_message_pemateri = $responsePemateri['_json_error_data']['message'] ?? ($responsePemateri['_body'] ?? 'Gagal memuat data pemateri dari API.');
+                Log::error('[GET_MASTER_PEMATERI] API Error: ' . $error_message_pemateri, $responsePemateri);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('[GET_MASTER_PEMATERI] Exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            $error_message_pemateri = 'Terjadi kesalahan sistem saat memuat data pemateri.';
+        }
+
+        if ($error_message_pemateri) {
+            Log::error("Error saat memproses master pemateri: " . $error_message_pemateri);
+        }
+        return $masterPemateri;
+    }
+
     public function create()
     {
-        $masterPemateriResult = $this->apiService->getPemateriKegiatanList();
-        $masterPemateri = new Collection();
-        if ($masterPemateriResult && !isset($masterPemateriResult['_error']) && is_array($masterPemateriResult)) {
-            $masterPemateri = collect($masterPemateriResult)->map(fn($item) => (object) $item);
-        } else {
-            Log::error('Gagal mengambil data master pemateri dari API untuk form create.', $masterPemateriResult ?? []);
+        $masterPemateri = $this->getProcessedMasterPemateri();
+        
+        if ($masterPemateri->isEmpty()) {
+             Log::warning('[KEGIATAN_CREATE] Tidak ada data master pemateri yang dapat dimuat untuk form tambah kegiatan.');
         }
-        return view('tambah-kegiatan', compact('masterPemateri')); 
+        return view('tambah-kegiatan', compact('masterPemateri'));
     }
 
     public function store(Request $request)
@@ -156,33 +224,31 @@ class KegiatanController extends Controller
         Log::info('[STORE_KEGIATAN] Menerima request data:', $request->all());
 
         $validatedData = $request->validate([
-             'judul' => 'required|string|max:50',
-             'media' => 'required|string|max:20', 
-             'lokasi' => 'nullable|string|max:50', 
-             'template_sertifikat' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
-             'keterangan_kegiatan' => 'nullable|string', 
-             'bobot_kegiatan' => 'required|integer|min:0',    
-             'sesi' => 'required|array|min:1', 
+             'judul' => 'required|string|max:100',
+             'media' => 'required|string|max:20',
+             'lokasi' => 'nullable|string|max:50',
+             'keterangan_kegiatan' => 'nullable|string',
+             'bobot_kegiatan' => 'required|integer|min:0',
+             'sesi' => 'required|array|min:1',
              'sesi.*.tanggal' => 'required|date_format:Y-m-d',
              'sesi.*.jam_mulai' => 'required|date_format:H:i',
              'sesi.*.jam_selesai' => 'nullable|date_format:H:i|after_or_equal:sesi.*.jam_mulai',
-             'sesi.*.pemateri_ids' => 'required|array|min:1', 
-             'sesi.*.pemateri_ids.*' => 'required|numeric' 
+             'sesi.*.id_pemateri' => 'required|numeric'
         ]);
 
         $nextKegiatanId = $this->apiService->getNextId('kegiatan', 'id_kegiatan');
 
-        if ($nextKegiatanId === null) { 
+        if ($nextKegiatanId === null) {
             Log::error('[STORE_KEGIATAN] Gagal men-generate ID Kegiatan.');
             return back()->withInput()->withErrors(['api_error_kegiatan' => 'Gagal men-generate ID Kegiatan. Periksa koneksi atau log API.']);
         }
         
         $apiKegiatanData = [
-            'id_kegiatan' => $nextKegiatanId, 
+            'id_kegiatan' => $nextKegiatanId,
             'judul_kegiatan' => $validatedData['judul'],
-            'media' => $validatedData['media'], 
-            'lokasi' => $validatedData['lokasi'] ?? '', 
-            'keterangan' => $validatedData['keterangan_kegiatan'] ?? '', 
+            'media' => $validatedData['media'],
+            'lokasi' => $validatedData['lokasi'] ?? '',
+            'keterangan' => $validatedData['keterangan_kegiatan'] ?? '',
         ];
         Log::info('[STORE_KEGIATAN] Mengirim data kegiatan utama ke API:', $apiKegiatanData);
         $responseKegiatan = $this->apiService->createKegiatan($apiKegiatanData);
@@ -194,78 +260,42 @@ class KegiatanController extends Controller
             return back()->withInput()->withErrors(['api_error_kegiatan' => 'Gagal menyimpan data kegiatan utama: ' . $apiMessage . $apiErrors]);
         }
         Log::info('[STORE_KEGIATAN] Respon API kegiatan utama:', $responseKegiatan);
-        $createdKegiatanId = $nextKegiatanId; 
-
-        if ($request->hasFile('template_sertifikat') && $request->file('template_sertifikat')->isValid()) {
-            try {
-                $file = $request->file('template_sertifikat');
-                $namaFileSertifikat = 'tpl_sert_keg_' . $createdKegiatanId . '_' . time() . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/sertifikat_templates_kegiatan', $namaFileSertifikat); 
-                Log::info('[STORE_KEGIATAN] Template sertifikat berhasil diunggah: ' . $namaFileSertifikat);
-                
-                $nextSertifikatId = $this->apiService->getNextId('sertifikat', 'id_sertifikat');
-                if ($nextSertifikatId === null) {
-                    Log::error("[STORE_KEGIATAN] Gagal men-generate ID Sertifikat.");
-                } else {
-                    $apiSertifikatData = [
-                        'id' => $nextSertifikatId, // atau 'id_sertifikat' tergantung API Anda
-                        'id_kegiatan' => $createdKegiatanId,
-                        'nama_file' => $namaFileSertifikat,
-                        'nim' => 'TEMPLATE_KEGIATAN', 
-                    ];
-                    Log::info('[STORE_KEGIATAN] Mengirim data sertifikat template ke API:', $apiSertifikatData);
-                    $responseSertifikat = $this->apiService->createSertifikat($apiSertifikatData); 
-                    if (!$responseSertifikat || isset($responseSertifikat['_error']) || ($responseSertifikat['success'] ?? false) !== true) {
-                        Log::error('[STORE_KEGIATAN] Gagal menyimpan info sertifikat template via API.', $responseSertifikat ?? []);
-                    } else {
-                        Log::info('[STORE_KEGIATAN] Respon API sertifikat template:', $responseSertifikat);
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::error('[STORE_KEGIATAN] Gagal mengunggah atau menyimpan info file sertifikat: ' . $e->getMessage());
-            }
-        }
+        $createdKegiatanId = $nextKegiatanId;
         
         if (isset($validatedData['sesi']) && is_array($validatedData['sesi'])) {
             foreach ($validatedData['sesi'] as $indexSesi => $dataSesi) {
-                $nextJadwalId = $this->apiService->getNextId('jadwal-kegiatan', 'id_jadwal'); 
+                $nextJadwalId = $this->apiService->getNextId('jadwal-kegiatan', 'id_jadwal');
                 if ($nextJadwalId === null) {
                     Log::error("[STORE_KEGIATAN] Gagal men-generate ID Jadwal untuk sesi index {$indexSesi}.");
-                    continue; 
+                    continue;
                 }
 
                 $waktuMulaiString = $dataSesi['tanggal'] . ' ' . $dataSesi['jam_mulai'] . ':00';
                 $waktuSelesaiString = (isset($dataSesi['jam_selesai']) && !empty($dataSesi['jam_selesai'])) ? $dataSesi['tanggal'] . ' ' . $dataSesi['jam_selesai'] . ':00' : null;
-                $idPemateriUntukSesiIni = $dataSesi['pemateri_ids'][0] ?? 0; 
+                
+                $idPemateriUntukSesiIni = $dataSesi['id_pemateri'] ?? 0;
                 if (empty($idPemateriUntukSesiIni) && $idPemateriUntukSesiIni !== 0) {
-                     $idPemateriUntukSesiIni = 0; 
+                     $idPemateriUntukSesiIni = 0;
                 }
 
                 $apiJadwalData = [
-                    'id' => $nextJadwalId, 
+                    'id' => $nextJadwalId,
                     'id_kegiatan' => $createdKegiatanId,
                     'tgl_kegiatan' => $dataSesi['tanggal'],
-                    'waktu_mulai' => $waktuMulaiString, 
+                    'waktu_mulai' => $waktuMulaiString,
                     'waktu_selesai' => $waktuSelesaiString,
-                    'bobot' => $validatedData['bobot_kegiatan'], 
-                    'keterangan' => $validatedData['keterangan_kegiatan'] ?? ('Sesi ke-' . ($indexSesi + 1) . ' untuk ' . $validatedData['judul']), 
-                    'id_pemateri' => (int) $idPemateriUntukSesiIni, 
-                    'kode_random' => Str::upper(Str::random(10)) 
+                    'bobot' => $validatedData['bobot_kegiatan'],
+                    'keterangan' => $validatedData['keterangan_kegiatan'] ?? ('Sesi ke-' . ($indexSesi + 1) . ' untuk ' . $validatedData['judul']),
+                    'id_pemateri' => (int) $idPemateriUntukSesiIni,
+                    'kode_random' => Str::upper(Str::random(10))
                 ];
                 
                 Log::info("[STORE_KEGIATAN] Mengirim data jadwal (Sesi ".($indexSesi+1).") ke API:", $apiJadwalData);
-                $responseJadwal = $this->apiService->createJadwalKegiatan($apiJadwalData); 
+                $responseJadwal = $this->apiService->createJadwalKegiatan($apiJadwalData);
                 if (!$responseJadwal || isset($responseJadwal['_error']) || ($responseJadwal['success'] ?? false) !== true) {
                     Log::error('[STORE_KEGIATAN] Gagal menyimpan jadwal kegiatan (Sesi '.($indexSesi+1).') via API.', $responseJadwal ?? []);
                 } else {
                     Log::info('[STORE_KEGIATAN] Respon API jadwal (Sesi '.($indexSesi+1).'):', $responseJadwal);
-                }
-                if(isset($dataSesi['pemateri_ids']) && is_array($dataSesi['pemateri_ids'])){
-                    foreach ($dataSesi['pemateri_ids'] as $idPemateriDariForm) {
-                        if (!empty($idPemateriDariForm)) {
-                            Log::warning("[STORE_KEGIATAN] Memproses ID_PEMATERI: {$idPemateriDariForm} untuk kegiatan '{$createdKegiatanId}' (Sesi ".($indexSesi+1)."). Endpoint API untuk relasi ini perlu dibuat jika belum ada.");
-                        }
-                    }
                 }
             }
         }
@@ -275,19 +305,20 @@ class KegiatanController extends Controller
     public function show(string $id)
     {
         $kegiatan = null;
+        $templateSertifikatGlobal = null; // Untuk menyimpan info template global
         Log::info("[SHOW_KEGIATAN] Memulai pengambilan data untuk ID Kegiatan: {$id}");
         try {
             $kegiatanListResult = $this->apiService->getKegiatanList();
             if ($kegiatanListResult && !isset($kegiatanListResult['_error']) && is_array($kegiatanListResult)) {
                 
                 $foundItemArray = collect($kegiatanListResult)->first(function ($itemArray) use ($id) {
-                    $itemAsObject = (object) $itemArray; 
+                    $itemAsObject = (object) $itemArray;
                     return ($itemAsObject->id_kegiatan ?? $itemAsObject->ID_KEGIATAN ?? null) == $id;
                 });
 
                 if ($foundItemArray) {
-                    $rawKegiatanObject = (object) $foundItemArray; 
-                    $kegiatan = clone $rawKegiatanObject; 
+                    $rawKegiatanObject = (object) $foundItemArray;
+                    $kegiatan = clone $rawKegiatanObject;
                     $idKegiatanUtama = $kegiatan->id_kegiatan ?? $kegiatan->ID_KEGIATAN ?? null;
 
                     $allJadwalResult = $this->apiService->getJadwalKegiatanList();
@@ -299,34 +330,50 @@ class KegiatanController extends Controller
                             try { return \Carbon\Carbon::parse($waktu)->timestamp; } catch (\Exception $e) { try { return \Carbon\Carbon::parse($tgl)->timestamp; } catch (\Exception $ex) { return 0;}}
                         })->values();
 
-                    $allMasterPemateriResult = $this->apiService->getPemateriKegiatanList();
-                    $allMasterPemateri = ($allMasterPemateriResult && !isset($allMasterPemateriResult['_error'])) ? collect($allMasterPemateriResult)->map(fn($item) => (object) $item) : new Collection();
+                    $allMasterPemateriProcessed = $this->getProcessedMasterPemateri();
                     $kegiatan->pemateri = new Collection();
+
                     if ($kegiatan->jadwal->isNotEmpty()) {
                         foreach($kegiatan->jadwal as $jadwalItem) {
                             $idPemateriDiJadwal = $jadwalItem->id_pemateri ?? null;
                             if ($idPemateriDiJadwal) {
-                                $foundMasterPemateri = $allMasterPemateri->firstWhere('id_pemateri', $idPemateriDiJadwal);
+                                $foundMasterPemateri = $allMasterPemateriProcessed->firstWhere('id_pemateri', $idPemateriDiJadwal);
                                 if($foundMasterPemateri){
-                                    $namaPemateri = $foundMasterPemateri->nama_pemateri ?? 'Nama Pemateri Tidak Ditemukan';
                                     if (!$kegiatan->pemateri->contains('id_pemateri', $idPemateriDiJadwal)) {
-                                        $kegiatan->pemateri->push((object)['id_pemateri' => $idPemateriDiJadwal, 'nama_pemateri' => $namaPemateri]);
+                                         $kegiatan->pemateri->push($foundMasterPemateri);
                                     }
                                 }
                             }
                         }
                     }
                     
-                    $kegiatan->template_sertifikat_file = null;
-                    $sertifikatResult = $this->apiService->getSertifikatList();
-                    if($sertifikatResult && !isset($sertifikatResult['_error']) && is_array($sertifikatResult)){
-                        $sertifikatTerkait = collect($sertifikatResult)->first(function($sert) use ($idKegiatanUtama){
-                            $sert = (object) $sert;
-                            return ($sert->id_kegiatan ?? null) == $idKegiatanUtama && 
-                                (is_null($sert->nim ?? null) || ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN');
-                        });
-                        if($sertifikatTerkait) $kegiatan->template_sertifikat_file = (object) $sertifikatTerkait;
+                    // Ambil template sertifikat global
+                    $sertifikatGlobalResult = $this->apiService->getSertifikatList([
+                        'id_kegiatan' => $this->dummyKegiatanIdForTemplate, // Dari config('app.dummy_kegiatan_id_for_template')
+                        'nim' => $this->globalTemplateNimIdentifier // Dari config('app.global_template_nim_identifier')
+                    ]);
+
+                    if($sertifikatGlobalResult && !isset($sertifikatGlobalResult['_error']) && is_array($sertifikatGlobalResult)){
+                        // API mungkin mengembalikan array dari item, jadi kita ambil yang pertama
+                        $globalTemplateData = collect($sertifikatGlobalResult)->first();
+                        if($globalTemplateData) {
+                            $templateSertifikatGlobal = (object) $globalTemplateData;
+                        }
                     }
+                    if(!$templateSertifikatGlobal) { // Fallback jika filter di atas tidak berhasil
+                        $allSertifikatResult = $this->apiService->getSertifikatList();
+                        if($allSertifikatResult && !isset($allSertifikatResult['_error']) && is_array($allSertifikatResult)){
+                            $globalTemplateData = collect($allSertifikatResult)->first(function($sert) {
+                                $sert = (object) $sert;
+                                return (string)($sert->id_kegiatan ?? null) === (string)$this->dummyKegiatanIdForTemplate &&
+                                       strtoupper($sert->nim ?? '') === strtoupper($this->globalTemplateNimIdentifier);
+                            });
+                            if($globalTemplateData) {
+                                $templateSertifikatGlobal = (object) $globalTemplateData;
+                            }
+                        }
+                    }
+
 
                 } else { abort(404, 'Kegiatan tidak ditemukan.'); }
             } else { abort(500, 'Gagal mengambil data kegiatan.'); }
@@ -334,18 +381,19 @@ class KegiatanController extends Controller
             Log::error("[SHOW_KEGIATAN] Exception saat memproses detail kegiatan ID {$id}: " . $e->getMessage());
             abort(500, 'Terjadi kesalahan server.');
         }
-        if (!$kegiatan) { abort(404, 'Kegiatan tidak ditemukan.'); } 
+        if (!$kegiatan) { abort(404, 'Kegiatan tidak ditemukan.'); }
         
-        return view('kegiatan-detail', compact('kegiatan'));
+        return view('kegiatan-detail', compact('kegiatan', 'templateSertifikatGlobal'));
     }
 
     public function edit(string $id)
     {
         $kegiatan = null;
-        $masterPemateri = new Collection();
+        $masterPemateri = $this->getProcessedMasterPemateri();
         Log::info("[EDIT_KEGIATAN] Memulai pengambilan data untuk edit ID Kegiatan: {$id}");
+
         try {
-            $kegiatanListResult = $this->apiService->getKegiatanList(); 
+            $kegiatanListResult = $this->apiService->getKegiatanList();
             if ($kegiatanListResult && !isset($kegiatanListResult['_error']) && is_array($kegiatanListResult)) {
                 
                 $foundItemArray = collect($kegiatanListResult)->first(function ($itemArray) use ($id) {
@@ -354,8 +402,8 @@ class KegiatanController extends Controller
                 });
 
                 if ($foundItemArray) {
-                    $rawKegiatanObject = (object) $foundItemArray; 
-                    $kegiatan = clone $rawKegiatanObject; 
+                    $rawKegiatanObject = (object) $foundItemArray;
+                    $kegiatan = clone $rawKegiatanObject;
                     
                     $idKegiatanUtama = $kegiatan->id_kegiatan ?? $kegiatan->ID_KEGIATAN ?? null;
 
@@ -368,38 +416,14 @@ class KegiatanController extends Controller
                         try { return \Carbon\Carbon::parse($waktu)->timestamp; } catch (\Exception $e) { return \Carbon\Carbon::parse($tgl)->timestamp;}
                         })->values();
                     
-                    $masterPemateriResult = $this->apiService->getPemateriKegiatanList();
-                    if($masterPemateriResult && !isset($masterPemateriResult['_error']) && is_array($masterPemateriResult)){
-                        $masterPemateri = collect($masterPemateriResult)->map(fn($item) => (object) $item);
-                    }
-                    
-                    $kegiatan->selected_pemateri_ids = new Collection(); 
-                    if ($kegiatan->jadwal->isNotEmpty()) {
-                        foreach($kegiatan->jadwal as $jadwalItem) {
-                            $idPemateriDiJadwal = $jadwalItem->id_pemateri ?? null;
-                            if ($idPemateriDiJadwal && !$kegiatan->selected_pemateri_ids->contains($idPemateriDiJadwal)) {
-                                $kegiatan->selected_pemateri_ids->push($idPemateriDiJadwal);
-                            }
-                        }
-                    }
-
-                    $kegiatan->template_sertifikat_file = null; 
-                    $sertifikatResult = $this->apiService->getSertifikatList();
-                    if($sertifikatResult && !isset($sertifikatResult['_error']) && is_array($sertifikatResult)){
-                        $sertifikatTerkait = collect($sertifikatResult)->first(function($sert) use ($idKegiatanUtama){
-                            $sert = (object) $sert;
-                            return ($sert->id_kegiatan ?? null) == $idKegiatanUtama && 
-                                (is_null($sert->nim ?? null) || ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN');
-                        });
-                        if($sertifikatTerkait) { $kegiatan->template_sertifikat_file = (object) $sertifikatTerkait; }
-                    }
                 } else { abort(404, 'Kegiatan tidak ditemukan untuk diedit.'); }
             } else { abort(500, 'Gagal mengambil data kegiatan untuk diedit.'); }
         } catch (\Exception $e) {
-            Log::error("[EDIT_KEGIATAN] Exception saat memproses data edit kegiatan ID {$id}: " . $e->getMessage());
+            Log::error("[EDIT_KEGIATAN] Exception saat memproses data edit kegiatan ID {$id}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             abort(500, 'Terjadi kesalahan server.');
         }
         if (!$kegiatan) { abort(404, 'Kegiatan tidak ditemukan.'); }
+        
         return view('kegiatan-edit', compact('kegiatan', 'masterPemateri'));
     }
 
@@ -419,22 +443,20 @@ class KegiatanController extends Controller
         }
 
         $validatedData = $request->validate([
-            'judul' => 'required|string|max:50',
+            'judul' => 'required|string|max:100',
             'media' => 'required|string|max:20',
             'lokasi' => 'nullable|string|max:50',
-            'template_sertifikat' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:2048',
             'keterangan_kegiatan' => 'nullable|string',
             'bobot_kegiatan' => 'required|integer|min:0',
             'sesi' => 'required|array|min:1',
             'sesi.*.tanggal' => 'required|date_format:Y-m-d',
             'sesi.*.jam_mulai' => 'required|date_format:H:i',
             'sesi.*.jam_selesai' => 'nullable|date_format:H:i|after_or_equal:sesi.*.jam_mulai',
-            'sesi.*.id_pemateri' => 'required|numeric' // Form edit mengirim id_pemateri per sesi
+            'sesi.*.id_pemateri' => 'required|numeric'
         ]);
 
         $idKegiatanToUpdate = $id;
 
-        // 1. Update Data Kegiatan Utama
         $apiKegiatanData = [
             'judul_kegiatan' => $validatedData['judul'],
             'media' => $validatedData['media'],
@@ -452,73 +474,16 @@ class KegiatanController extends Controller
         }
         Log::info('[UPDATE_KEGIATAN] Respon API update kegiatan utama:', $responseKegiatan ?? '[No JSON Response Body]');
 
-        // 2. Handle Update/Upload File Sertifikat
-        if ($request->hasFile('template_sertifikat') && $request->file('template_sertifikat')->isValid()) {
-            Log::info("[UPDATE_KEGIATAN] File sertifikat baru diunggah untuk kegiatan ID {$idKegiatanToUpdate}.");
-            
-            // Cari dan hapus sertifikat lama jika ada
-            $sertifikatListResult = $this->apiService->getSertifikatList(); // Ambil semua, lalu filter
-            if ($sertifikatListResult && !isset($sertifikatListResult['_error']) && is_array($sertifikatListResult)) {
-                $oldSertifikatData = collect($sertifikatListResult)->first(function($sertArray) use ($idKegiatanToUpdate){
-                    $sert = (object) $sertArray;
-                    return ($sert->id_kegiatan ?? null) == $idKegiatanToUpdate && ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN';
-                });
+        // Logika upload template sertifikat dihapus
 
-                if($oldSertifikatData){
-                    $oldSertifikatData = (object) $oldSertifikatData; // Pastikan objek
-                    $oldSertifikatId = $oldSertifikatData->id_sertifikat ?? $oldSertifikatData->id ?? null;
-                    $oldNamaFile = $oldSertifikatData->nama_file ?? null;
-                    if($oldSertifikatId){
-                        Log::info("[UPDATE_KEGIATAN] Menghapus template sertifikat lama ID record: {$oldSertifikatId}");
-                        $this->apiService->deleteSertifikat($oldSertifikatId);
-                    }
-                    if ($oldNamaFile) {
-                        Log::info("[UPDATE_KEGIATAN] Menghapus file sertifikat lama dari storage: {$oldNamaFile}");
-                        Storage::delete('public/sertifikat_templates_kegiatan/' . $oldNamaFile);
-                    }
-                }
-            }
-
-            // Simpan sertifikat baru
-            try {
-                $file = $request->file('template_sertifikat');
-                $namaFileSertifikat = 'tpl_sert_keg_' . $idKegiatanToUpdate . '_' . time() . '.' . $file->getClientOriginalExtension();
-                $file->storeAs('public/sertifikat_templates_kegiatan', $namaFileSertifikat);
-                Log::info("[UPDATE_KEGIATAN] File sertifikat baru berhasil diunggah: " . $namaFileSertifikat);
-
-                $nextSertifikatId = $this->apiService->getNextId('sertifikat', 'id_sertifikat');
-                if ($nextSertifikatId !== null) {
-                    $apiSertifikatData = [
-                        'id' => $nextSertifikatId,
-                        'id_kegiatan' => $idKegiatanToUpdate,
-                        'nama_file' => $namaFileSertifikat,
-                        'nim' => 'TEMPLATE_KEGIATAN',
-                    ];
-                    Log::info('[UPDATE_KEGIATAN] Mengirim data sertifikat template baru ke API:', $apiSertifikatData);
-                    $resSertPost = $this->apiService->createSertifikat($apiSertifikatData);
-                    if (!$resSertPost || isset($resSertPost['_error']) || ($resSertPost['success'] ?? false) !== true) {
-                        Log::error('[UPDATE_KEGIATAN] Gagal menyimpan record sertifikat template baru via API.', $resSertPost ?? []);
-                    } else {
-                        Log::info('[UPDATE_KEGIATAN] Sukses menyimpan record sertifikat template baru.');
-                    }
-                } else {
-                    Log::error("[UPDATE_KEGIATAN] Gagal men-generate ID untuk sertifikat baru.");
-                }
-            } catch (\Exception $e) {
-                Log::error('[UPDATE_KEGIATAN] Gagal mengunggah atau menyimpan info file sertifikat baru: ' . $e->getMessage());
-            }
-        }
-
-        // 3. Handle Update Jadwal Kegiatan (Strategi: Hapus semua jadwal lama, lalu insert yang baru dari form)
         Log::info("[UPDATE_KEGIATAN] Memulai proses update jadwal untuk kegiatan ID {$idKegiatanToUpdate}.");
         
-        // Ambil dan Hapus Jadwal Lama beserta Kehadiran Terkait
-        $jadwalLamaResult = $this->apiService->getJadwalKegiatanList(); // Ambil semua, lalu filter
+        $jadwalLamaResult = $this->apiService->getJadwalKegiatanList();
         if ($jadwalLamaResult && !isset($jadwalLamaResult['_error']) && is_array($jadwalLamaResult)) {
             $jadwalLamaUntukKegiatanIni = collect($jadwalLamaResult)->filter(fn($jArray) => (((object)$jArray)->id_kegiatan ?? null) == $idKegiatanToUpdate);
 
             if ($jadwalLamaUntukKegiatanIni->isNotEmpty()) {
-                $allHadirKegiatanList = $this->apiService->getHadirKegiatanList(); // Ambil semua data hadir sekali
+                $allHadirKegiatanList = $this->apiService->getHadirKegiatanList();
                 $allHadirKegiatan = ($allHadirKegiatanList && !isset($allHadirKegiatanList['_error'])) ? collect($allHadirKegiatanList)->map(fn($h) => (object)$h) : new Collection();
 
                 foreach($jadwalLamaUntukKegiatanIni as $jadwalLamaArray){
@@ -543,8 +508,6 @@ class KegiatanController extends Controller
             }
         }
 
-
-        // Buat ulang jadwal dari data sesi yang ada di form
         if (isset($validatedData['sesi']) && is_array($validatedData['sesi'])) {
             foreach ($validatedData['sesi'] as $indexSesi => $dataSesi) {
                 $nextJadwalId = $this->apiService->getNextId('jadwal-kegiatan', 'id_jadwal');
@@ -555,19 +518,18 @@ class KegiatanController extends Controller
                 $waktuMulaiString = $dataSesi['tanggal'] . ' ' . $dataSesi['jam_mulai'] . ':00';
                 $waktuSelesaiString = (isset($dataSesi['jam_selesai']) && !empty($dataSesi['jam_selesai'])) ? $dataSesi['tanggal'] . ' ' . $dataSesi['jam_selesai'] . ':00' : null;
                 
-                // Di form edit, 'id_pemateri' dikirim langsung per sesi, bukan array 'pemateri_ids'
-                $idPemateriUntukSesiIni = $dataSesi['id_pemateri'] ?? 0; 
+                $idPemateriUntukSesiIni = $dataSesi['id_pemateri'] ?? 0;
                 if (empty($idPemateriUntukSesiIni) && $idPemateriUntukSesiIni !== 0) $idPemateriUntukSesiIni = 0;
 
                 $apiJadwalData = [
                     'id' => $nextJadwalId,
-                    'id_kegiatan' => (int) $idKegiatanToUpdate, 
+                    'id_kegiatan' => (int) $idKegiatanToUpdate,
                     'tgl_kegiatan' => $dataSesi['tanggal'],
                     'waktu_mulai' => $waktuMulaiString,
                     'waktu_selesai' => $waktuSelesaiString,
                     'bobot' => $validatedData['bobot_kegiatan'],
                     'keterangan' => $validatedData['keterangan_kegiatan'] ?? ('Sesi ke-' . ($indexSesi + 1) . ' untuk ' . $validatedData['judul']),
-                    'id_pemateri' => (int) $idPemateriUntukSesiIni, 
+                    'id_pemateri' => (int) $idPemateriUntukSesiIni,
                     'kode_random' => Str::upper(Str::random(10))
                 ];
                 Log::info('[UPDATE_KEGIATAN] Mengirim data jadwal baru (Sesi '.($indexSesi+1).') ke API:', $apiJadwalData);
@@ -583,44 +545,21 @@ class KegiatanController extends Controller
         return redirect()->route('kegiatan.index')->with('success', 'Kegiatan berhasil diupdate.');
     }
 
-    public function destroy(string $id) 
+    public function destroy(string $id)
     {
-        $idKegiatan = $id; 
+        $idKegiatan = $id;
         Log::info("[DESTROY_KEGIATAN] Memulai proses penghapusan untuk ID Kegiatan: {$idKegiatan}");
         $errors = [];
         try {
-            // Hapus sertifikat terkait
-            $sertifikatResult = $this->apiService->getSertifikatList(); 
-            if ($sertifikatResult && !isset($sertifikatResult['_error']) && is_array($sertifikatResult)) {
-                foreach ($sertifikatResult as $sertifikatArray) {
-                    $s = (object) $sertifikatArray;
-                    if (($s->id_kegiatan ?? null) == $idKegiatan) { 
-                        $idSertifikatToDelete = $s->id_sertifikat ?? $s->id ?? null;
-                        if ($idSertifikatToDelete) {
-                            $delResponse = $this->apiService->deleteSertifikat($idSertifikatToDelete);
-                            if (!$delResponse || isset($delResponse['_error']) || ($delResponse['success'] ?? false) !== true) {
-                                $errors[] = "Gagal hapus sertifikat ID {$idSertifikatToDelete}";
-                            } else {
-                                // Hapus file fisik jika record API berhasil dihapus
-                                if (isset($s->nama_file) && !empty($s->nama_file)) {
-                                    Storage::delete('public/sertifikat_templates_kegiatan/' . $s->nama_file);
-                                    Log::info("[DESTROY_KEGIATAN] Berhasil hapus file sertifikat fisik: {$s->nama_file}");
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Hapus kehadiran terkait jadwal, lalu hapus jadwal
-            $jadwalResult = $this->apiService->getJadwalKegiatanList(); 
+            // Logika penghapusan sertifikat terkait kegiatan dihilangkan
+            $jadwalResult = $this->apiService->getJadwalKegiatanList();
             if ($jadwalResult && !isset($jadwalResult['_error']) && is_array($jadwalResult)) {
                 $allHadirKegiatanList = $this->apiService->getHadirKegiatanList();
                 $allHadirKegiatan = ($allHadirKegiatanList && !isset($allHadirKegiatanList['_error'])) ? collect($allHadirKegiatanList)->map(fn($h) => (object)$h) : new Collection();
 
                 foreach ($jadwalResult as $jadwalArray) {
                     $j = (object) $jadwalArray;
-                    if (($j->id_kegiatan ?? null) == $idKegiatan) { 
+                    if (($j->id_kegiatan ?? null) == $idKegiatan) {
                         $idJadwalToDelete = $j->id_jadwal ?? $j->id ?? null;
                         if ($idJadwalToDelete) {
                             $hadirTerkaitJadwal = $allHadirKegiatan->where('id_jadwal', $idJadwalToDelete);
@@ -636,7 +575,7 @@ class KegiatanController extends Controller
                 }
             }
             
-            if (empty($errors)) { 
+            if (empty($errors)) {
                 $response = $this->apiService->deleteKegiatan($idKegiatan);
                 if ($response && !isset($response['_error']) && ($response['success'] ?? false) === true) {
                     return redirect()->route('kegiatan.index')->with('success', 'Kegiatan dan data terkait berhasil dihapus!');
@@ -646,15 +585,15 @@ class KegiatanController extends Controller
                     Log::error("[DESTROY_KEGIATAN] Gagal hapus kegiatan utama.", $response ?? []);
                 }
             }
-        } catch (\Exception $e) { 
-            Log::error("[DESTROY_KEGIATAN] Exception: " . $e->getMessage()); 
+        } catch (\Exception $e) {
+            Log::error("[DESTROY_KEGIATAN] Exception: " . $e->getMessage());
             $errors[] = "Terjadi kesalahan server saat menghapus.";
         }
         
         return redirect()->route('kegiatan.index')->withErrors(['api_error' => 'Gagal menghapus kegiatan atau beberapa data terkait. ' . implode('; ', $errors)]);
     }
 
-    public function daftarHadir(string $idKegiatan) 
+    public function daftarHadir(string $idKegiatan)
     {
         Log::info("[DAFTAR_HADIR] Memulai pengambilan data untuk ID Kegiatan: {$idKegiatan}");
         $kegiatan = null;

@@ -3,8 +3,15 @@
 @section('title', 'Validasi Aksara Dinamika')
 @section('page_title', 'Validasi Aksara Dinamika')
 
+@push('styles')
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+@endpush
+
 @section('content')
-<div class="bg-white p-6 shadow-lg rounded-lg max-w-7xl mx-auto">
+{{-- Initialize Alpine.js data context on a parent element --}}
+<div class="bg-white p-6 shadow-lg rounded-lg max-w-7xl mx-auto" x-data="{ showAksaraReportModal: false }">
     <div class="flex flex-col md:flex-row justify-between md:items-center mb-6 space-y-4 md:space-y-0">
         <h2 class="text-2xl font-bold text-gray-800">Validasi Aksara Dinamika</h2>
         
@@ -33,6 +40,13 @@
                 @endif
             </form>
 
+            {{-- Tombol Report PDF Aksara Dinamika --}}
+            <button @click="showAksaraReportModal = true"
+               class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full md:w-auto justify-center">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625a1.875 1.875 0 00-1.875 1.875v17.25a1.875 1.875 0 001.875 1.875h12.75a1.875 1.875 0 001.875-1.875V11.25a9 9 0 00-9-9z"></path></svg>
+                Report PDF
+            </button>
+
             {{-- Dropdown Filter Status --}}
             <select 
                 id="statusFilterSelect"
@@ -47,6 +61,7 @@
         </div>
     </div>
 
+    {{-- (Notifikasi dan tabel tetap sama) --}}
     @if(session('success'))
         <div class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md" role="alert">
             <p>{{ session('success') }}</p>
@@ -75,7 +90,6 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">No</th>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Nama Buku</th>
-                        {{-- PERUBAHAN: Judul kolom diubah menjadi Pengarang --}}
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Pengarang</th>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Pengirim</th>
                         <th class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Status</th>
@@ -87,7 +101,6 @@
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $submissions->firstItem() + $key }}</td>
                         <td class="px-6 py-4 text-sm font-medium text-gray-800">{{ $item->JUDUL ?? '-' }}</td>
-                        {{-- PERUBAHAN: Menampilkan data Pengarang --}}
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $item->PENGARANG ?? '-' }}</td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $item->NAMA ?? ($item->NIM ?? '-') }}</td>
                         <td class="px-6 py-4">
@@ -119,7 +132,70 @@
             {{ $submissions->links('vendor.pagination.tailwind') }}
         </div>
     @endif
+
+    {{-- Modal Report PDF Aksara --}}
+    <div x-show="showAksaraReportModal" 
+        x-cloak 
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        class="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+        <div @click.outside="showAksaraReportModal = false" 
+             x-transition
+             class="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-semibold text-gray-800">Filter Laporan Aksara Dinamika</h3>
+                <button @click="showAksaraReportModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <form action="{{ route('validasi.aksara.report.pdf') }}" method="GET" target="_blank">
+                 <input type="hidden" name="search" value="{{ rawurldecode(request('search', '')) }}">
+                <div class="space-y-4">
+                    <div>
+                        <label for="start_date_validasi_report" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai Validasi/Submit</label> {{-- ID diubah untuk unik --}}
+                        <input type="date" name="start_date_validasi" id="start_date_validasi_report"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 py-2 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label for="end_date_validasi_report" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai Validasi/Submit</label> {{-- ID diubah untuk unik --}}
+                        <input type="date" name="end_date_validasi" id="end_date_validasi_report"
+                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 py-2 px-3 text-sm">
+                    </div>
+                    <div>
+                        <label for="status_validasi_report" class="block text-sm font-medium text-gray-700 mb-1">Status Validasi</label> {{-- ID diubah untuk unik --}}
+                        <select name="status_validasi" id="status_validasi_report"
+                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-200 py-2 px-3 text-sm">
+                            <option value="">Semua Status</option>
+                            <option value="pending">Menunggu Validasi</option>
+                            <option value="diterima">Diterima</option>
+                            <option value="ditolak">Ditolak</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="showAksaraReportModal = false" 
+                            class="px-5 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 focus:outline-none transition-colors">
+                        Batal
+                    </button>
+                    <button type="submit" 
+                            class="px-5 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none transition-colors">
+                        Cetak PDF
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+@push('scripts')
+{{-- Script untuk handleStatusFilterChange sudah ada di bawah --}}
+{{-- AlpineJS sudah di-include di layout utama, jika belum, tambahkan: --}}
+{{-- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script> --}}
+@endpush
 
 <script>
     function handleStatusFilterChange(selectElement) {

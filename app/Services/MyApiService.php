@@ -34,7 +34,7 @@ class MyApiService
         }
 
         $this->primaryKeyMap = [
-            'sertifikat' => 'id', 
+            'sertifikat' => 'id_sertifikat', 
             'kegiatan' => 'id_kegiatan',
             'civitas' => 'id_civitas',
             'histori-status' => 'id_histori_status',

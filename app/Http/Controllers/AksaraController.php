@@ -45,17 +45,17 @@ class AksaraController extends Controller
         Log::info('[AKSARA_INDEX_START] Memulai proses pengambilan data. Filter Status: ' . $statusFilter);
 
         try {
-            $responseSubmissions = $this->apiService->getAksaraDinamikaList(); 
+            $responseSubmissions = $this->apiService->getAksaraDinamikaList();
             if (!$responseSubmissions || isset($responseSubmissions['_error'])) {
                 Log::error('[AKSARA_INDEX_ERROR] Gagal mengambil data Aksara Dinamika.', $responseSubmissions ?? []);
                 return back()->withErrors(['api_error' => 'Gagal memuat data Aksara Dinamika.']);
             }
-            if (empty($responseSubmissions) && !is_array($responseSubmissions)) { 
-                $responseSubmissions = []; 
+            if (empty($responseSubmissions) && !is_array($responseSubmissions)) {
+                $responseSubmissions = [];
             }
 
             $responseHistoriStatus = $this->apiService->readHistoriStatus();
-            $latestHistories = new Collection(); 
+            $latestHistories = new Collection();
 
             if ($responseHistoriStatus && !isset($responseHistoriStatus['_error']) && is_array($responseHistoriStatus)) {
                 $allHistoriStatus = collect($responseHistoriStatus)->map(function($historiItem){
@@ -63,10 +63,9 @@ class AksaraController extends Controller
                     $h->id_aksara_dinamika_histori = (string) ($h->id_aksara_dinamika ?? $h->ID_AKSARA_DINAMIKA ?? null);
                     $h->tgl_status_parsed = (isset($h->tgl_status) && !empty(trim((string)$h->tgl_status))) ? Carbon::parse($h->tgl_status) : null;
                     
-                    // Normalisasi status dari histori ke lowercase Bahasa Indonesia
-                    $h->status_histori = strtolower($h->status ?? 'pending'); 
+                    $h->status_histori = strtolower($h->status ?? 'pending');
                     $h->user_pust_status_histori = $h->user_pust_status ?? $h->USER_PUST_STATUS ?? null;
-                    $h->keterangan_histori = $h->keterangan ?? null; // Ambil keterangan
+                    $h->keterangan_histori = $h->keterangan ?? null;
                     return $h;
                 });
 
@@ -81,7 +80,7 @@ class AksaraController extends Controller
             }
 
             $submissionsCollection = collect($responseSubmissions)->map(function($itemArray) use ($latestHistories) {
-                $item = (object) $itemArray; 
+                $item = (object) $itemArray;
                 $newItem = new \stdClass();
                 $currentAksaraId = (string) ($item->id_aksara_dinamika ?? $item->ID_AKSARA_DINAMIKA ?? null);
                 
@@ -92,12 +91,11 @@ class AksaraController extends Controller
                 $latestHistoryEntry = $latestHistories->get($currentAksaraId);
 
                 if ($latestHistoryEntry) {
-                    $newItem->STATUS = $latestHistoryEntry->status_histori; // Sudah 'diterima', 'ditolak', atau 'pending'
-                    $newItem->ALASAN_PENOLAKAN = $latestHistoryEntry->keterangan_histori ?? null; // Gunakan keterangan dari histori
+                    $newItem->STATUS = $latestHistoryEntry->status_histori;
+                    $newItem->ALASAN_PENOLAKAN = $latestHistoryEntry->keterangan_histori ?? null;
                     $newItem->VALIDATOR_ID = $latestHistoryEntry->user_pust_status_histori ?? null;
                     $newItem->TGL_VALIDASI = $latestHistoryEntry->tgl_status_parsed ? $latestHistoryEntry->tgl_status_parsed->translatedFormat('d F Y H:i') : null;
                 } else {
-                    // Fallback jika tidak ada histori
                     $newItem->STATUS = strtolower(
                         $item->status_validasi ??
                         $item->STATUS_VALIDASI ??
@@ -117,8 +115,8 @@ class AksaraController extends Controller
                 $newItem->REVIEW = $item->review ?? $item->REVIEW ?? null;
                 $newItem->DOSEN_USULAN = $item->dosen_usulan ?? $item->DOSEN_USULAN ?? null;
                 $newItem->LINK_UPLOAD = $item->link_upload ?? $item->LINK_UPLOAD ?? null;
-                $newItem->PENGARANG = $item->pengarang1 ?? $item->PENGARANG1 ?? null; 
-                $newItem->EMAIL = $item->email ?? null; 
+                $newItem->PENGARANG = $item->pengarang1 ?? $item->PENGARANG1 ?? null;
+                $newItem->EMAIL = $item->email ?? null;
  
                 return $newItem;
             });
@@ -132,10 +130,9 @@ class AksaraController extends Controller
                 });
             }
 
-            // Filter menggunakan nilai 'pending', 'diterima', 'ditolak'
-            if ($statusFilter && in_array($statusFilter, ['pending', 'diterima', 'ditolak'])) { 
+            if ($statusFilter && in_array($statusFilter, ['pending', 'diterima', 'ditolak'])) {
                 $submissionsCollection = $submissionsCollection->filter(function($item) use ($statusFilter){
-                    return ($item->STATUS ?? 'pending') === $statusFilter; 
+                    return ($item->STATUS ?? 'pending') === $statusFilter;
                 });
             }
 
@@ -155,7 +152,7 @@ class AksaraController extends Controller
 
         return view('validasi-aksara', [
             'submissions' => $submissions,
-            'searchTerm' => $searchTerm 
+            'searchTerm' => $searchTerm
         ]);
     }
 
@@ -165,8 +162,8 @@ class AksaraController extends Controller
         $peserta = null;
         try {
             $responseApi = $this->apiService->getAksaraDinamikaList();
-            $responseHistoriStatus = $this->apiService->readHistoriStatus(); 
-            $responseCivitas = $this->apiService->getCivitasList(); 
+            $responseHistoriStatus = $this->apiService->readHistoriStatus();
+            $responseCivitas = $this->apiService->getCivitasList();
 
             if (!$responseApi || isset($responseApi['_error']) || !is_array($responseApi)) {
                 Log::error("[AKSARA_SHOW] Gagal mengambil data Aksara Dinamika atau format salah.", $responseApi ?? []);
@@ -196,7 +193,7 @@ class AksaraController extends Controller
             
             $peserta->VALIDATOR_ID = null;
             $peserta->TGL_VALIDASI = null;
-            $peserta->NAMA_VALIDATOR = null; 
+            $peserta->NAMA_VALIDATOR = null;
 
             $latestHistori = null;
             if ($responseHistoriStatus && !isset($responseHistoriStatus['_error']) && is_array($responseHistoriStatus)) {
@@ -205,9 +202,9 @@ class AksaraController extends Controller
                         $h = (object) $historiItem;
                         $h->id_aksara_dinamika_histori = (string) ($h->id_aksara_dinamika ?? $h->ID_AKSARA_DINAMIKA ?? null);
                         $h->tgl_status_parsed = (isset($h->tgl_status) && !empty(trim((string)$h->tgl_status))) ? Carbon::parse($h->tgl_status) : null;
-                        $h->status_histori = strtolower($h->status ?? 'pending'); // Ambil status dari histori
-                        $h->user_pust_status_histori = $h->user_pust_status ?? $h->USER_PUST_STATUS ?? null; 
-                        $h->keterangan_histori = $h->keterangan ?? null; // Ambil keterangan dari histori
+                        $h->status_histori = strtolower($h->status ?? 'pending'); 
+                        $h->user_pust_status_histori = $h->user_pust_status ?? $h->USER_PUST_STATUS ?? null;
+                        $h->keterangan_histori = $h->keterangan ?? null;
                         return $h;
                     })
                     ->where('id_aksara_dinamika_histori', $currentAksaraId)
@@ -217,19 +214,18 @@ class AksaraController extends Controller
             }
 
             if ($latestHistori) {
-                $peserta->STATUS = $latestHistori->status_histori; // Gunakan status dari histori
-                $peserta->ALASAN_PENOLAKAN = $latestHistori->keterangan_histori ?? null; // Gunakan keterangan dari histori
+                $peserta->STATUS = $latestHistori->status_histori;
+                $peserta->ALASAN_PENOLAKAN = $latestHistori->keterangan_histori ?? null;
                 $peserta->VALIDATOR_ID = $latestHistori->user_pust_status_histori ?? null;
                 $peserta->TGL_VALIDASI = $latestHistori->tgl_status_parsed ? $latestHistori->tgl_status_parsed->translatedFormat('d F Y \p\u\k\u\l H:i') : null;
 
                 if ($peserta->VALIDATOR_ID && $responseCivitas && !isset($responseCivitas['_error']) && is_array($responseCivitas)) {
-                    $validatorData = collect($responseCivitas)->firstWhere('id_civitas', (string)$peserta->VALIDATOR_ID); 
+                    $validatorData = collect($responseCivitas)->firstWhere('id_civitas', (string)$peserta->VALIDATOR_ID);
                     if ($validatorData) {
                         $peserta->NAMA_VALIDATOR = ((object)$validatorData)->nama ?? null;
                     }
                 }
             } else {
-                // Fallback jika tidak ada histori
                 $peserta->STATUS = strtolower($item->status_validasi ?? $item->STATUS_VALIDASI ?? $item->submission_status ?? 'pending');
                 $peserta->ALASAN_PENOLAKAN = $item->alasan_penolakan ?? $item->ALASAN_PENOLAKAN ?? null;
             }
@@ -247,7 +243,7 @@ class AksaraController extends Controller
     public function setuju(Request $request, $id)
     {
         $authenticatedCivitas = Session::get('authenticated_civitas');
-        $validatorId = $authenticatedCivitas['id_civitas'] ?? 'SYSTEM_VALIDATOR'; 
+        $validatorId = $authenticatedCivitas['id_civitas'] ?? 'SYSTEM_VALIDATOR';
 
         if ($validatorId === 'SYSTEM_VALIDATOR') {
             Log::warning("[AKSARA_SETUJU] Tidak dapat menemukan ID Civitas validator dari session. Menggunakan fallback.");
@@ -255,19 +251,19 @@ class AksaraController extends Controller
 
         $nextHistoriId = $this->apiService->getNextId('histori-status', 'id_histori_status');
 
-        if ($nextHistoriId === null) { 
-            Log::warning("[AKSARA_TOLAK] Gagal mendapatkan ID berikutnya untuk histori_status dari API. Menggunakan ID default 1 sebagai fallback."); 
-            $nextHistoriId = 1; // Gunakan ID default jika API gagal memberikan ID berikutnya
-            // Tidak perlu redirect dengan error, lanjutkan proses dengan ID fallback
-        } 
+        if ($nextHistoriId === null) {
+            Log::error("[AKSARA_SETUJU] Gagal mendapatkan ID berikutnya untuk histori_status dari API.");
+            return redirect()->route('validasi.aksara.detail', ['id' => $id] + $request->query())
+                             ->with('error', "Gagal memproses persetujuan: Tidak bisa generate ID histori. Pastikan API histori-status berfungsi.");
+        }
 
         $historiData = [
-            'id_histori_status' => $nextHistoriId, 
+            'id_histori_status' => $nextHistoriId,
             'id_aksara_dinamika' => $id,
-            'status' => 'diterima', // KIRIM 'diterima' KE API
+            'status' => 'diterima',
             'keterangan' => 'Karya disetujui oleh validator.',
-            'tgl_status' => Carbon::now()->toDateTimeString(), 
-            'user' => $validatorId 
+            'tgl_status' => Carbon::now()->toDateTimeString(),
+            'user' => $validatorId
         ];
 
         Log::info("[AKSARA_SETUJU] Mencoba menyetujui Aksara ID {$id} dengan data:", $historiData);
@@ -280,11 +276,8 @@ class AksaraController extends Controller
         } else {
             Log::error("[AKSARA_SETUJU] Gagal membuat histori status 'diterima' via API untuk ID Aksara {$id}", $result ?? []);
             $apiErrorMessage = $result['_json_error_data']['message'] ?? ($result['_body'] ?? 'Error tidak diketahui dari API.');
-            if (isset($result['_json_error_data']['errors'])) { 
+            if (isset($result['_json_error_data']['errors'])) {
                 $apiErrorMessage .= " Details: " . json_encode($result['_json_error_data']['errors']);
-            }
-            if (str_contains(strtolower($apiErrorMessage ?? ''), 'duplicate entry') && str_contains(strtolower($apiErrorMessage ?? ''), (string)$nextHistoriId)) {
-                 $apiErrorMessage = "Terjadi konflik ID saat menyimpan histori. Coba lagi.";
             }
             return redirect()->route('validasi.aksara.detail', ['id' => $id] + $request->query())
                              ->with('error', "Gagal menyetujui karya: " . $apiErrorMessage);
@@ -294,7 +287,7 @@ class AksaraController extends Controller
     public function tolak(Request $request, $id)
     {
         $request->validate([
-            'alasan' => 'required|string|max:255', 
+            'alasan' => 'required|string|max:255',
         ]);
 
         $authenticatedCivitas = Session::get('authenticated_civitas');
@@ -307,18 +300,18 @@ class AksaraController extends Controller
         $nextHistoriId = $this->apiService->getNextId('histori-status', 'id_histori_status');
 
         if ($nextHistoriId === null) {
-            Log::error("[AKSARA_TOLAK] Gagal mendapatkan ID berikutnya untuk histori_status.");
+            Log::error("[AKSARA_TOLAK] Gagal mendapatkan ID berikutnya untuk histori_status dari API.");
             return redirect()->route('validasi.aksara.detail', ['id' => $id] + $request->query())
-                             ->with('error', "Gagal memproses penolakan: Tidak bisa generate ID histori.");
+                             ->with('error', "Gagal memproses penolakan: Tidak bisa generate ID histori. Pastikan API histori-status berfungsi.");
         }
 
         $historiData = [
-            'id_histori_status' => $nextHistoriId, 
+            'id_histori_status' => $nextHistoriId,
             'id_aksara_dinamika' => $id,
-            'status' => 'ditolak', // KIRIM 'ditolak' KE API
+            'status' => 'ditolak',
             'keterangan' => $request->input('alasan'),
-            'tgl_status' => Carbon::now()->toDateTimeString(), 
-            'user' => $validatorId 
+            'tgl_status' => Carbon::now()->toDateTimeString(),
+            'user' => $validatorId
         ];
 
         Log::info("[AKSARA_TOLAK] Mencoba menolak Aksara ID {$id} dengan data:", $historiData);
@@ -331,11 +324,8 @@ class AksaraController extends Controller
         } else {
             Log::error("[AKSARA_TOLAK] Gagal membuat histori status 'ditolak' via API untuk ID Aksara {$id}", $result ?? []);
             $apiErrorMessage = $result['_json_error_data']['message'] ?? ($result['_body'] ?? 'Error tidak diketahui dari API.');
-            if (isset($result['_json_error_data']['errors'])) { 
+            if (isset($result['_json_error_data']['errors'])) {
                 $apiErrorMessage .= " Details: " . json_encode($result['_json_error_data']['errors']);
-            }
-             if (str_contains(strtolower($apiErrorMessage ?? ''), 'duplicate entry') && str_contains(strtolower($apiErrorMessage ?? ''), (string)$nextHistoriId)) {
-                 $apiErrorMessage = "Terjadi konflik ID saat menyimpan histori. Coba lagi.";
             }
             return redirect()->route('validasi.aksara.detail', ['id' => $id] + $request->query())
                              ->with('error', "Gagal menolak karya: " . $apiErrorMessage);
