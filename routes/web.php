@@ -45,10 +45,11 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
 
     // Contoh routes untuk Master Pemateri
-    Route::get('/master-pemateri', [PemateriController::class, 'index'])->name('master-pemateri.index');
-    Route::get('/master-pemateri/create', [PemateriController::class, 'create'])->name('master-pemateri.create');
-    Route::post('/master-pemateri', [PemateriController::class, 'store'])->name('master-pemateri.store');
+    Route::get('/pemateri', [PemateriController::class, 'index'])->name('master-pemateri.index');
+    Route::get('/pemateri/create', [PemateriController::class, 'create'])->name('master-pemateri.create');
+    Route::post('/pemateri', [PemateriController::class, 'store'])->name('master-pemateri.store');
     // Tambahkan route untuk edit, update, delete jika perlu
+    Route::delete('/pemateri/{pemateri}', [PemateriController::class, 'destroy'])->name('master-pemateri.destroy');
 
     // --- Route Periode ---
     Route::get('/periode', [App\Http\Controllers\PeriodeController::class, 'index'])->name('periode.index'); 

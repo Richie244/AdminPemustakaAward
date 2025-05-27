@@ -61,9 +61,19 @@
             
             <nav>
                 <ul>
+                    {{-- Item Menu Dashboard (Sebelumnya Report) --}}
+                    <li class="mb-3">
+                        {{-- Ganti url('/report') dengan route yang sesuai untuk Dashboard jika sudah ada --}}
+                        <a href="{{ url('/dashboard') }}" 
+                           class="nav-item flex items-center p-3 rounded-lg group
+                                  {{ request()->is('dashboard*') ? 'bg-blue-600 text-white font-semibold shadow-md' : 'hover:bg-slate-700 hover:text-white' }}">
+                            <svg class="w-5 h-5 mr-3 text-slate-400 group-hover:text-white {{ request()->is('dashboard*') ? 'text-white' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                            Dashboard
+                        </a>
+                    </li>
                     {{-- Item Menu Periode --}}
                     <li class="mb-3">
-                        <a href="{{ route('periode.index') }}" {{-- Pastikan route 'periode.index' ada --}}
+                        <a href="{{ route('periode.index') }}" 
                            class="nav-item flex items-center p-3 rounded-lg group
                                   {{ request()->is('periode*') || request()->is('detailperiode/*') || request()->is('settingperiode') ? 'bg-blue-600 text-white font-semibold shadow-md' : 'hover:bg-slate-700 hover:text-white' }}">
                             <svg class="w-5 h-5 mr-3 text-slate-400 group-hover:text-white {{ request()->is('periode*') || request()->is('detailperiode/*') || request()->is('settingperiode') ? 'text-white' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>
@@ -88,15 +98,6 @@
                             Validasi Aksara
                         </a>
                     </li>
-                    {{-- Item Menu Report --}}
-                    <li class="mb-3">
-                        <a href="{{ url('/report') }}" {{-- Menggunakan url() jika route belum ada --}}
-                           class="nav-item flex items-center p-3 rounded-lg group
-                                  {{ request()->is('report') ? 'bg-blue-600 text-white font-semibold shadow-md' : 'hover:bg-slate-700 hover:text-white' }}">
-                            <svg class="w-5 h-5 mr-3 text-slate-400 group-hover:text-white {{ request()->is('report') ? 'text-white' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                            Report
-                        </a>
-                    </li>
                 </ul>
             </nav>
 
@@ -117,7 +118,7 @@
                     <div class="flex items-center justify-between">
                         {{-- Judul Halaman Dinamis (Opsional, bisa diambil dari @yield('page_title') jika ada) --}}
                         <h1 class="text-xl font-semibold text-gray-700">
-                            @yield('page_title', '') {{-- Default ke Dashboard jika tidak ada judul spesifik --}}
+                            @yield('page_title', 'Dashboard') {{-- Default ke Dashboard jika tidak ada judul spesifik --}}
                         </h1>
 
                         {{-- Informasi Pengguna dan Logout --}}
@@ -137,8 +138,8 @@
                             </form>
                         </div>
                         @else
-                         {{-- Opsional: Tampilkan link login jika belum login (seharusnya tidak terjadi jika halaman ini diakses setelah login) --}}
-                         <a href="{{ route('login') }}" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Login</a>
+                           {{-- Opsional: Tampilkan link login jika belum login (seharusnya tidak terjadi jika halaman ini diakses setelah login) --}}
+                           <a href="{{ route('login') }}" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">Login</a>
                         @endif
                     </div>
                 </div>

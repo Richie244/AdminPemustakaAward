@@ -258,15 +258,15 @@ class KegiatanController extends Controller
                 if (!$responseJadwal || isset($responseJadwal['_error']) || ($responseJadwal['success'] ?? false) !== true) {
                     Log::error('[STORE_KEGIATAN] Gagal menyimpan jadwal kegiatan (Sesi '.($indexSesi+1).') via API.', $responseJadwal ?? []);
                 } else {
-                     Log::info('[STORE_KEGIATAN] Respon API jadwal (Sesi '.($indexSesi+1).'):', $responseJadwal);
+                    Log::info('[STORE_KEGIATAN] Respon API jadwal (Sesi '.($indexSesi+1).'):', $responseJadwal);
                 }
-                 if(isset($dataSesi['pemateri_ids']) && is_array($dataSesi['pemateri_ids'])){
-                     foreach ($dataSesi['pemateri_ids'] as $idPemateriDariForm) {
-                         if (!empty($idPemateriDariForm)) {
-                             Log::warning("[STORE_KEGIATAN] Memproses ID_PEMATERI: {$idPemateriDariForm} untuk kegiatan '{$createdKegiatanId}' (Sesi ".($indexSesi+1)."). Endpoint API untuk relasi ini perlu dibuat jika belum ada.");
-                         }
-                     }
-                 }
+                if(isset($dataSesi['pemateri_ids']) && is_array($dataSesi['pemateri_ids'])){
+                    foreach ($dataSesi['pemateri_ids'] as $idPemateriDariForm) {
+                        if (!empty($idPemateriDariForm)) {
+                            Log::warning("[STORE_KEGIATAN] Memproses ID_PEMATERI: {$idPemateriDariForm} untuk kegiatan '{$createdKegiatanId}' (Sesi ".($indexSesi+1)."). Endpoint API untuk relasi ini perlu dibuat jika belum ada.");
+                        }
+                    }
+                }
             }
         }
         return redirect()->route('kegiatan.index')->with('success', 'Kegiatan berhasil disimpan.');
@@ -323,7 +323,7 @@ class KegiatanController extends Controller
                         $sertifikatTerkait = collect($sertifikatResult)->first(function($sert) use ($idKegiatanUtama){
                             $sert = (object) $sert;
                             return ($sert->id_kegiatan ?? null) == $idKegiatanUtama && 
-                                   (is_null($sert->nim ?? null) || ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN');
+                                (is_null($sert->nim ?? null) || ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN');
                         });
                         if($sertifikatTerkait) $kegiatan->template_sertifikat_file = (object) $sertifikatTerkait;
                     }
@@ -363,9 +363,9 @@ class KegiatanController extends Controller
                     $allJadwal = ($jadwalResult && !isset($jadwalResult['_error'])) ? collect($jadwalResult)->map(fn($item) => (object) $item) : new Collection();
                     $kegiatan->jadwal = $allJadwal->filter(fn($jadwal) => ($jadwal->id_kegiatan ?? $jadwal->ID_KEGIATAN ?? null) == $idKegiatanUtama)
                         ->sortBy(function($jadwal) {
-                           $tgl = $jadwal->tgl_kegiatan ?? '1970-01-01 00:00:00';
-                           $waktu = $jadwal->waktu_mulai ?? $tgl;
-                           try { return \Carbon\Carbon::parse($waktu)->timestamp; } catch (\Exception $e) { return \Carbon\Carbon::parse($tgl)->timestamp;}
+                        $tgl = $jadwal->tgl_kegiatan ?? '1970-01-01 00:00:00';
+                        $waktu = $jadwal->waktu_mulai ?? $tgl;
+                        try { return \Carbon\Carbon::parse($waktu)->timestamp; } catch (\Exception $e) { return \Carbon\Carbon::parse($tgl)->timestamp;}
                         })->values();
                     
                     $masterPemateriResult = $this->apiService->getPemateriKegiatanList();
@@ -389,7 +389,7 @@ class KegiatanController extends Controller
                         $sertifikatTerkait = collect($sertifikatResult)->first(function($sert) use ($idKegiatanUtama){
                             $sert = (object) $sert;
                             return ($sert->id_kegiatan ?? null) == $idKegiatanUtama && 
-                                   (is_null($sert->nim ?? null) || ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN');
+                                (is_null($sert->nim ?? null) || ($sert->nim ?? null) == 'TEMPLATE_KEGIATAN');
                         });
                         if($sertifikatTerkait) { $kegiatan->template_sertifikat_file = (object) $sertifikatTerkait; }
                     }
@@ -502,7 +502,7 @@ class KegiatanController extends Controller
                         Log::info('[UPDATE_KEGIATAN] Sukses menyimpan record sertifikat template baru.');
                     }
                 } else {
-                     Log::error("[UPDATE_KEGIATAN] Gagal men-generate ID untuk sertifikat baru.");
+                    Log::error("[UPDATE_KEGIATAN] Gagal men-generate ID untuk sertifikat baru.");
                 }
             } catch (\Exception $e) {
                 Log::error('[UPDATE_KEGIATAN] Gagal mengunggah atau menyimpan info file sertifikat baru: ' . $e->getMessage());
@@ -537,7 +537,7 @@ class KegiatanController extends Controller
                     Log::info("[UPDATE_KEGIATAN] Menghapus jadwal lama ID: {$idJadwalLama}");
                     $delJadwalRes = $this->apiService->deleteJadwalKegiatan($idJadwalLama);
                     if (!$delJadwalRes || isset($delJadwalRes['_error'])){
-                         Log::error("[UPDATE_KEGIATAN] Gagal hapus jadwal lama ID {$idJadwalLama}.", $delJadwalRes ?? []);
+                        Log::error("[UPDATE_KEGIATAN] Gagal hapus jadwal lama ID {$idJadwalLama}.", $delJadwalRes ?? []);
                     }
                 }
             }
@@ -643,7 +643,7 @@ class KegiatanController extends Controller
                 } else {
                     $apiMessage = $response['message'] ?? ($response['_body'] ?? 'Gagal menghapus data kegiatan utama.');
                     $errors[] = $apiMessage;
-                     Log::error("[DESTROY_KEGIATAN] Gagal hapus kegiatan utama.", $response ?? []);
+                    Log::error("[DESTROY_KEGIATAN] Gagal hapus kegiatan utama.", $response ?? []);
                 }
             }
         } catch (\Exception $e) { 

@@ -34,22 +34,23 @@ class MyApiService
         }
 
         $this->primaryKeyMap = [
-            'sertifikat' => 'id', // Asumsi dari controller sebelumnya, bisa juga 'id_sertifikat'
+            'sertifikat' => 'id', 
             'kegiatan' => 'id_kegiatan',
             'civitas' => 'id_civitas',
             'histori-status' => 'id_histori_status',
             'periode_award' => 'id_periode',
-            'periode' => 'id_periode', // Endpoint API untuk periode
+            'periode' => 'id_periode', 
             'rangekunjungan_award' => 'id_range_kunjungan',
-            'range-kunjungan' => 'id_range_kunjungan', // Endpoint API untuk range kunjungan
+            'range-kunjungan' => 'id_range_kunjungan', 
             'reward_award' => 'id_reward',
-            'reward' => 'id_reward', // Endpoint API untuk reward
+            'reward' => 'id_reward', 
             'pembobotan_award' => 'id_pembobotan',
-            'pembobotan' => 'id_pembobotan', // Endpoint API untuk pembobotan
-            'pematerikegiatan_pust' => 'id_pemateri', // Untuk getNextId dari PemateriController
-            'pemateri' => 'id_pemateri',           // Endpoint API untuk pemateri
-            'perusahaan_pemateri_pust' => 'id_perusahaan', // Untuk getNextId dari PemateriController
-            'perusahaan-pemateri' => 'id_perusahaan', // Endpoint API untuk perusahaan pemateri
+            'pembobotan' => 'id_pembobotan', 
+            'pematerikegiatan_pust' => 'id_pemateri', 
+            'pemateri' => 'id_pemateri',           
+            'pemateri-kegiatan' => 'id_pemateri', 
+            'perusahaan_pemateri_pust' => 'id_perusahaan', 
+            'perusahaan-pemateri' => 'id_perusahaan', 
             'default' => 'id',
         ];
     }
@@ -78,7 +79,7 @@ class MyApiService
                 '_error' => true,
                 '_status' => $response->status(),
                 '_body' => $response->body(),
-                '_json_error_data' => $response->json()
+                '_json_error_data' => $response->json() 
             ];
         }
         
@@ -162,63 +163,55 @@ class MyApiService
         return null;
     }
 
-    // --- Metode untuk endpoint PERIODE_AWARD ---
     public function getPeriodeList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('periode', $params), 'Gagal mengambil daftar periode');
     }
     public function createPeriode(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('periode', $data), 'Gagal membuat periode');
     }
-
-    // --- Metode untuk endpoint RANGEKUNJUNGAN_AWARD ---
     public function getRangeKunjunganList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('range-kunjungan', $params), 'Gagal mengambil daftar range kunjungan');
     }
     public function createRangeKunjungan(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('range-kunjungan', $data), 'Gagal membuat range kunjungan');
     }
-
-    // --- Metode untuk endpoint REWARD_AWARD ---
     public function getRewardList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('reward', $params), 'Gagal mengambil daftar reward');
     }
     public function createReward(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('reward', $data), 'Gagal membuat reward');
     }
-
-    // --- Metode untuk endpoint PEMBOBOTAN_AWARD ---
     public function getPembobotanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('pembobotan', $params), 'Gagal mengambil daftar pembobotan');
     }
     public function createPembobotan(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('pembobotan', $data), 'Gagal membuat pembobotan');
     }
-
-    // --- Metode untuk endpoint PEMATERI ---
     public function getPemateriList(array $params = []): ?array {
-        // Pastikan endpoint 'pemateri' sudah ada di routes/api.php Anda
-        return $this->handleResponse($this->httpClient->get('pemateri', $params), 'Gagal mengambil daftar pemateri');
+        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri');
+    }
+    public function createPemateri(array $data): ?array {
+        Log::info('[MyApiService] createPemateri data:', $data);
+        return $this->handleResponse($this->httpClient->asJson()->post('pemateri-kegiatan', $data), 'Gagal membuat pemateri');
     }
 
-    public function createPemateri(array $data): ?array {
-        // Pastikan endpoint 'pemateri' (POST) sudah ada di routes/api.php Anda
-        // dan Controller API yang sesuai menangani penyimpanan ke PEMATERIKEGIATAN_PUST
-        Log::info('[MyApiService] createPemateri data:', $data);
-        return $this->handleResponse($this->httpClient->asJson()->post('pemateri', $data), 'Gagal membuat pemateri');
+    public function deletePemateri(string $id): ?array {
+        Log::info("[MyApiService] Menghapus pemateri dengan ID: {$id}");
+        // Pastikan endpoint API Anda adalah 'pemateri-kegiatan/{id}' dengan metode DELETE
+        return $this->handleResponse($this->httpClient->delete("pemateri-kegiatan/{$id}"), "Gagal menghapus pemateri ID: {$id}");
     }
 
     // --- Metode untuk endpoint PERUSAHAAN PEMATERI ---
-    public function getPerusahaanPemateriList(array $params = []): ?array { // Jika Anda perlu mengambil list perusahaan
-        return $this->handleResponse($this->httpClient->get('perusahaan-pemateri', $params), 'Gagal mengambil daftar perusahaan pemateri');
+    public function getPerusahaanPemateriList(array $params = []): ?array { 
+        Log::info('[MyApiService] Mengambil daftar perusahaan pemateri dari endpoint /perusahaan');
+        $response = $this->httpClient->get('perusahaan', $params);
+        return $this->handleResponse($response, 'Gagal mengambil daftar perusahaan pemateri');
     }
 
     public function createPerusahaanPemateri(array $data): ?array {
-        // Pastikan endpoint 'perusahaan-pemateri' (POST) sudah ada di routes/api.php Anda
-        // dan Controller API yang sesuai menangani penyimpanan ke PERUSAHAAN_PEMATERI_PUST
         Log::info('[MyApiService] createPerusahaanPemateri data:', $data);
-        return $this->handleResponse($this->httpClient->asJson()->post('perusahaan-pemateri', $data), 'Gagal membuat perusahaan pemateri');
+        return $this->handleResponse($this->httpClient->asJson()->post('perusahaan', $data), 'Gagal membuat perusahaan pemateri');
     }
-
 
     // --- Metode lainnya yang sudah ada ---
     public function getKegiatanList(array $params = []): ?array {
@@ -233,7 +226,6 @@ class MyApiService
     public function deleteKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("kegiatan/{$id}"), "Gagal menghapus kegiatan ID: {$id}");
     }
-
     public function getJadwalKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('jadwal-kegiatan', $params), 'Gagal mengambil daftar jadwal kegiatan');
     }
@@ -243,14 +235,9 @@ class MyApiService
     public function deleteJadwalKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("jadwal-kegiatan/{$id}"), "Gagal menghapus jadwal kegiatan ID: {$id}");
     }
-
-    // getPemateriKegiatanList sebelumnya mungkin merujuk ke tabel relasi, 
-    // sedangkan getPemateriList yang baru adalah untuk master pemateri.
-    // Saya akan membiarkan yang lama jika masih digunakan di tempat lain.
-    public function getPemateriKegiatanList(array $params = []): ?array {
+    public function getPemateriKegiatanList(array $params = []): ?array { // Ini adalah metode yang berbeda dari getPemateriList()
         return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri kegiatan (relasi)');
     }
-
     public function getSertifikatList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('sertifikat', $params), 'Gagal mengambil daftar sertifikat');
     }
@@ -260,14 +247,12 @@ class MyApiService
     public function deleteSertifikat(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("sertifikat/{$id}"), "Gagal menghapus sertifikat ID: {$id}");
     }
-    
     public function getHadirKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('hadir-kegiatan', $params), 'Gagal mengambil daftar hadir kegiatan');
     }
     public function deleteHadirKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("hadir-kegiatan/{$id}"), "Gagal menghapus hadir kegiatan ID: {$id}");
     }
-    
     public function getAksaraDinamikaList(array $queryParams = []): ?array {
         return $this->handleResponse($this->httpClient->get('aksara-dinamika', $queryParams),'Gagal mengambil daftar Aksara Dinamika');
     }

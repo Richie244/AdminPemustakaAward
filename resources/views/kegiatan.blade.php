@@ -280,8 +280,3 @@
     } 
 </script> 
 @endpush
-```
-
-Saya telah menambahkan tombol "Master Pemateri" di file Blade pada Canvas. Tombol ini sekarang mengarah ke `route('master-pemateri.index')`.
-
-Anda perlu membuat route dan controller yang sesuai untuk menangani halaman "Master Pemateri", di mana Anda bisa mengelola daftar pemateri internal dan eksternal
