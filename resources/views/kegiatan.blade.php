@@ -6,6 +6,9 @@
 @push('styles')
 <style>
     [x-cloak] { display: none !important; }
+    .sesi-info { /* Tambahkan style jika perlu untuk tampilan multi-sesi */
+        display: block; /* Memastikan setiap sesi di baris baru jika menggunakan <br> */
+    }
 </style>
 @endpush
 
@@ -64,7 +67,6 @@
                 </div>
             </div> 
 
-            {{-- (Notifikasi dan tabel tetap sama) --}}
             @if(session('success'))
                 <div class="mb-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md" role="alert">
                     <p class="font-bold">Sukses!</p>
@@ -108,18 +110,17 @@
                     <table class="min-w-full w-full">  
                         <thead class="bg-gray-50"> 
                             <tr> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">No</th> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Judul Kegiatan</th> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Tanggal</th> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Waktu</th> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Pemateri</th> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Media/Lokasi</th> 
-                                <th scope="col" class="px-6 py-3 text-left text-sm font-semibold text-gray-600">Keterangan</th> 
-                                <th scope="col" class="px-6 py-3 text-center text-sm font-semibold text-gray-600">Bobot</th> 
-                                <th scope="col" class="px-6 py-3 text-center text-sm font-semibold text-gray-600">Aksi</th> 
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th> 
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Judul Kegiatan</th> 
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detail Sesi</th> {{-- Mengubah header kolom --}}
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pemateri</th> 
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Media/Lokasi</th> 
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Keterangan</th> 
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Bobot</th> 
+                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th> 
                             </tr> 
                         </thead> 
-                        <tbody class="divide-y divide-gray-200">  
+                        <tbody class="bg-white divide-y divide-gray-200">  
                             @foreach ($kegiatan as $index => $k)  
                                 @php 
                                     $kegiatanIdAlpine = 'kegiatan_' . preg_replace('/[^a-z0-9]/i', '_', $k->id_kegiatan ?? $k->ID_KEGIATAN ?? $loop->index);
@@ -128,13 +129,23 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ $kegiatan->firstItem() + $index }}</td> 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{{ $k->judul_kegiatan ?? ($k->JUDUL_KEGIATAN ?? '-') }}</td> 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"> 
-                                        {{ $k->jadwal->first() && property_exists($k->jadwal->first(), 'tgl_kegiatan') ? \Carbon\Carbon::parse($k->jadwal->first()->tgl_kegiatan)->translatedFormat('d M Y') : '-' }} 
-                                    </td> 
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"> 
-                                        {{ $k->jadwal->first() && property_exists($k->jadwal->first(), 'waktu_mulai') ? \Carbon\Carbon::parse($k->jadwal->first()->waktu_mulai)->format('H:i') : '-' }} 
-                                        @if($k->jadwal->first() && property_exists($k->jadwal->first(), 'waktu_selesai') && $k->jadwal->first()->waktu_selesai) 
-                                            - {{ \Carbon\Carbon::parse($k->jadwal->first()->waktu_selesai)->format('H:i') }} 
-                                        @endif 
+                                        {{-- Logika untuk menampilkan semua sesi --}}
+                                        @if($k->jadwal->isNotEmpty())
+                                            @foreach($k->jadwal as $sesiIndex => $jadwalSesi)
+                                                @php
+                                                    $tanggalSesi = property_exists($jadwalSesi, 'tgl_kegiatan') && $jadwalSesi->tgl_kegiatan ? \Carbon\Carbon::parse($jadwalSesi->tgl_kegiatan)->translatedFormat('d M Y') : '';
+                                                    $waktuMulai = property_exists($jadwalSesi, 'waktu_mulai') && $jadwalSesi->waktu_mulai ? \Carbon\Carbon::parse($jadwalSesi->waktu_mulai)->format('H:i') : '-';
+                                                    $waktuSelesai = property_exists($jadwalSesi, 'waktu_selesai') && $jadwalSesi->waktu_selesai ? \Carbon\Carbon::parse($jadwalSesi->waktu_selesai)->format('H:i') : '';
+                                                    $waktuDisplay = $waktuMulai;
+                                                    if ($waktuSelesai && $waktuSelesai !== '-') {
+                                                        $waktuDisplay .= ' - ' . $waktuSelesai;
+                                                    }
+                                                @endphp
+                                                <span class="sesi-info">Sesi {{ $sesiIndex + 1 }}: {{ $tanggalSesi }} ({{ $waktuDisplay }})</span>@if(!$loop->last)<br>@endif
+                                            @endforeach
+                                        @else
+                                            -
+                                        @endif
                                     </td> 
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"> 
                                         {{ $k->pemateri->isNotEmpty() ? $k->pemateri->pluck('nama_pemateri')->filter()->join(', ') : '-' }} 
@@ -302,8 +313,6 @@
 @endsection
 
 @push('scripts')
-{{-- AlpineJS sudah di-include di layout utama, jadi tidak perlu di sini lagi --}}
-{{-- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js" defer></script> --}} 
 <script> 
     function salinKodePresensi(kode, buttonTextId) {
         console.log('Mencoba menyalin kode:', kode, 'untuk buttonTextId:', buttonTextId);

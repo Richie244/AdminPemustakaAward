@@ -41,29 +41,29 @@ class SertifikatGeneratorController extends Controller
                 'id_kegiatan' => $this->dummyKegiatanIdForTemplate,
                 'nim' => $this->globalTemplateNimIdentifier
             ]);
-            
+
             if ($responseSertifikatGlobal && !isset($responseSertifikatGlobal['_error']) && is_array($responseSertifikatGlobal) && !empty($responseSertifikatGlobal)) {
                 // API mungkin mengembalikan array, ambil yang pertama jika ada
                 $templateData = (object) (isset($responseSertifikatGlobal[0]) ? $responseSertifikatGlobal[0] : $responseSertifikatGlobal);
-                 if (isset($templateData->nama_file)) {
+                if (isset($templateData->nama_file)) {
                     $namaFileBackground = $templateData->nama_file;
                     // Penting: Pastikan path ini benar dan bisa diakses oleh DomPDF
                     // DomPDF biasanya butuh path absolut di server.
                     $pathBackgroundAbsolut = storage_path('app/public/templates_sertifikat/' . $namaFileBackground); //
                     Log::info("[GENERATE_SERTIFIKAT_GLOBAL] Template background ditemukan: {$namaFileBackground}, path: {$pathBackgroundAbsolut}");
-                 } else {
+                } else {
                     Log::warning("[GENERATE_SERTIFIKAT_GLOBAL] Template background global ditemukan di API namun tidak ada nama_file.");
-                 }
+                }
             } else {
                 // Fallback jika filter di atas tidak mengembalikan hasil atau error
                 $allSertifikatResult = $this->apiService->getSertifikatList();
-                if($allSertifikatResult && !isset($allSertifikatResult['_error']) && is_array($allSertifikatResult)){
-                    $globalTemplateData = collect($allSertifikatResult)->first(function($sert) {
+                if ($allSertifikatResult && !isset($allSertifikatResult['_error']) && is_array($allSertifikatResult)) {
+                    $globalTemplateData = collect($allSertifikatResult)->first(function ($sert) {
                         $sert = (object) $sert;
                         return (string)($sert->id_kegiatan ?? null) === (string)$this->dummyKegiatanIdForTemplate &&
-                               strtoupper($sert->nim ?? '') === strtoupper($this->globalTemplateNimIdentifier);
+                            strtoupper($sert->nim ?? '') === strtoupper($this->globalTemplateNimIdentifier);
                     });
-                    if($globalTemplateData) {
+                    if ($globalTemplateData) {
                         $templateData = (object) $globalTemplateData;
                         if (isset($templateData->nama_file)) {
                             $namaFileBackground = $templateData->nama_file;
@@ -102,7 +102,7 @@ class SertifikatGeneratorController extends Controller
             $pesertaData = null;
             $responseCivitas = $this->apiService->getCivitasList(); // Ambil semua, lalu filter
             if ($responseCivitas && !isset($responseCivitas['_error']) && is_array($responseCivitas)) {
-                $foundCivitas = collect($responseCivitas)->first(function($item) use ($nim){
+                $foundCivitas = collect($responseCivitas)->first(function ($item) use ($nim) {
                     $c = (object) $item;
                     return ($c->id_civitas ?? $c->ID_CIVITAS ?? null) == $nim;
                 });
@@ -129,7 +129,7 @@ class SertifikatGeneratorController extends Controller
                     $pemateriDataList = $this->apiService->getPemateriKegiatanList();
                     if ($pemateriDataList && !isset($pemateriDataList['_error'])) {
                         $foundMasterPemateri = collect($pemateriDataList)->firstWhere('id_pemateri', $sesiPertama->id_pemateri);
-                        if($foundMasterPemateri){
+                        if ($foundMasterPemateri) {
                             // $jabatanPejabatSatu = "Pemateri"; // Sesuaikan jika perlu
                             // $namaPejabatSatu = $foundMasterPemateri->nama_pemateri ?? $namaPejabatSatu;
                             // $nipPejabatSatu = null; // Jika NIP tidak ada untuk pemateri
@@ -142,15 +142,11 @@ class SertifikatGeneratorController extends Controller
             // 4. Siapkan data untuk view
             $dataUntukView = [
                 'namaPeserta'           => $namaPeserta,
-                'judulKegiatanFormat'   => $judulKegiatanFormat, // Ini yang akan menggantikan "Peserta"
-                // 'peranText'             => strtoupper($peranPeserta), // Tidak lagi digunakan jika judul kegiatan menggantikan peran
-                'pathBackgroundAbsolut' => $pathBackgroundAbsolut, // Path absolut ke gambar background
-                'nomorSertifikat'       => '12345678', // Contoh nomor dari image_44feb4.png, buat dinamis jika perlu
-                // Data tanda tangan
+                'judulKegiatanFormat'   => $judulKegiatanFormat,
+                'pathBackgroundAbsolut' => $pathBackgroundAbsolut,
+                'nomorSertifikat'       => '12345678',
                 'jabatanPejabatSatu'    => $jabatanPejabatSatu,
                 'namaPejabatSatu'       => $namaPejabatSatu,
-                // 'nipPejabatSatu'        => $nipPejabatSatu ?? null,
-                // Anda bisa tambahkan pejabat kedua jika ada
             ];
 
             // 5. Generate PDF
@@ -178,7 +174,7 @@ class SertifikatGeneratorController extends Controller
                     $dataSertifikatApi = [
                         'nim' => $nim,
                         'id_kegiatan' => $idKegiatan,
-                        'nama_file' => $namaFilePdfPeserta, 
+                        'nama_file' => $namaFilePdfPeserta,
                     ];
                     if ($apiRequiresId && $nextIdSertifikat !== null) {
                         $dataSertifikatApi['id'] = $nextIdSertifikat;
@@ -188,7 +184,7 @@ class SertifikatGeneratorController extends Controller
                     $resultApi = $this->apiService->createSertifikat($dataSertifikatApi);
 
                     if ($resultApi && !isset($resultApi['_error']) && (isset($resultApi['id']) || isset($resultApi['id_sertifikat']) || isset($resultApi['_success_no_content']) || ($resultApi['success'] ?? false) === true)) {
-                         Log::info("[GENERATE_SERTIFIKAT_GLOBAL] Record sertifikat untuk NIM {$nim}, Kegiatan {$idKegiatan} berhasil disimpan ke API.");
+                        Log::info("[GENERATE_SERTIFIKAT_GLOBAL] Record sertifikat untuk NIM {$nim}, Kegiatan {$idKegiatan} berhasil disimpan ke API.");
                     } else {
                         Log::error("[GENERATE_SERTIFIKAT_GLOBAL] Gagal menyimpan record sertifikat ke API.", ['request' => $dataSertifikatApi, 'response' => $resultApi ?? []]);
                     }
@@ -200,7 +196,6 @@ class SertifikatGeneratorController extends Controller
             // 7. Kembalikan PDF untuk di-download
             $namaFileDownload = 'Sertifikat_' . Str::slug($namaPeserta) . '_' . Str::slug($judulKegiatanFormat) . '.pdf';
             return $pdf->download($namaFileDownload);
-
         } catch (\Exception $e) {
             Log::error("[GENERATE_SERTIFIKAT_GLOBAL] Exception: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return response("Terjadi kesalahan saat generate sertifikat PDF: " . $e->getMessage(), 500);

@@ -22,19 +22,22 @@ class ReportController extends Controller
     {
         $startDate = $request->input('start_date_kegiatan');
         $endDate = $request->input('end_date_kegiatan');
-        $searchTerm = $request->input('search'); // Jika ingin tetap menggunakan search term dari halaman utama
+        $searchTerm = $request->input('search');
 
         Log::info('[REPORT_KEGIATAN_PDF] Generate PDF. Filter Tanggal:', ['start' => $startDate, 'end' => $endDate, 'search' => $searchTerm]);
 
         $kegiatanList = new Collection();
         try {
-            // Logika pengambilan dan pemrosesan data kegiatan seperti di KegiatanController@index
             $allJadwalResult = $this->apiService->getJadwalKegiatanList();
             $allJadwal = ($allJadwalResult && !isset($allJadwalResult['_error']) && is_array($allJadwalResult)) ? collect($allJadwalResult)->map(fn($item) => (object) $item) : new Collection();
 
             $allMasterPemateriResult = $this->apiService->getPemateriKegiatanList();
             $allMasterPemateri = ($allMasterPemateriResult && !isset($allMasterPemateriResult['_error']) && is_array($allMasterPemateriResult)) ? collect($allMasterPemateriResult)->map(fn($item) => (object) $item) : new Collection();
             
+            // Ambil semua data kehadiran sekali saja
+            $allHadirResult = $this->apiService->getHadirKegiatanList();
+            $allHadirKegiatan = ($allHadirResult && !isset($allHadirResult['_error']) && is_array($allHadirResult)) ? collect($allHadirResult)->map(fn($item) => (object) $item) : new Collection();
+
             $responseKegiatanFromApi = $this->apiService->getKegiatanList($searchTerm ? ['search' => $searchTerm] : []);
 
             if ($responseKegiatanFromApi && !isset($responseKegiatanFromApi['_error']) && is_array($responseKegiatanFromApi)) {
@@ -51,7 +54,6 @@ class ReportController extends Controller
                             try { return Carbon::parse($jadwal->tgl_kegiatan . ' ' . $jadwal->waktu_mulai)->timestamp; } catch (\Exception $e) { return 0;}
                         })->values();
                     
-                    // Filter berdasarkan rentang tanggal jika ada
                     if ($startDate && $endDate) {
                         $k->jadwal = $k->jadwal->filter(function ($jadwalSesi) use ($startDate, $endDate) {
                             if (!isset($jadwalSesi->tgl_kegiatan)) return false;
@@ -63,10 +65,28 @@ class ReportController extends Controller
                             }
                         });
                     }
-                    // Hanya masukkan kegiatan jika masih memiliki jadwal setelah filter tanggal
+                    
                     if ($k->jadwal->isEmpty() && ($startDate || $endDate)) {
                         continue; 
                     }
+
+                    // Hitung total peserta hadir untuk kegiatan ini
+                    $totalPesertaHadirKegiatanIni = 0;
+                    $nimPesertaSudahDihitung = new Collection(); // Untuk memastikan NIM unik per kegiatan
+
+                    foreach ($k->jadwal as $jadwalItem) {
+                        $idJadwalIni = $jadwalItem->id_jadwal ?? $jadwalItem->id ?? null;
+                        if ($idJadwalIni) {
+                            $kehadiranUntukJadwalIni = $allHadirKegiatan->where('id_jadwal', (string) $idJadwalIni);
+                            foreach($kehadiranUntukJadwalIni as $hadir) {
+                                if (isset($hadir->nim) && !$nimPesertaSudahDihitung->contains($hadir->nim)) {
+                                    $nimPesertaSudahDihitung->push($hadir->nim);
+                                    $totalPesertaHadirKegiatanIni++;
+                                }
+                            }
+                        }
+                    }
+                    $k->total_peserta_hadir = $totalPesertaHadirKegiatanIni; //
 
                     $k->pemateri = new Collection();
                     if ($k->jadwal->isNotEmpty()) {
@@ -111,13 +131,12 @@ class ReportController extends Controller
         $startDate = $request->input('start_date_validasi');
         $endDate = $request->input('end_date_validasi');
         $statusFilter = $request->input('status_validasi');
-        $searchTerm = $request->input('search'); // Jika ingin tetap menggunakan search term dari halaman utama
+        $searchTerm = $request->input('search'); 
 
         Log::info('[REPORT_AKSARA_PDF] Generate PDF. Filter Tanggal:', ['start' => $startDate, 'end' => $endDate, 'status' => $statusFilter, 'search' => $searchTerm]);
 
         $submissionsCollection = new Collection();
         try {
-            // Logika pengambilan dan pemrosesan data Aksara Dinamika seperti di AksaraController@index
             $responseSubmissions = $this->apiService->getAksaraDinamikaList($searchTerm ? ['search' => $searchTerm] : []);
             if (!$responseSubmissions || isset($responseSubmissions['_error'])) {
                 throw new \Exception('Gagal mengambil data Aksara Dinamika.');
@@ -158,7 +177,6 @@ class ReportController extends Controller
                     $newItem->TGL_VALIDASI_CARBON = $latestHistoryEntry->tgl_status_parsed;
                 } else {
                     $newItem->STATUS = strtolower($item->status_validasi ?? $item->STATUS_VALIDASI ?? 'pending');
-                     // Coba parse TGL_SUBMIT jika TGL_VALIDASI dari histori tidak ada
                     if (isset($item->tgl_submit)) {
                         try { $newItem->TGL_VALIDASI_CARBON = Carbon::parse($item->tgl_submit); } catch (\Exception $e) {}
                     }
@@ -167,12 +185,10 @@ class ReportController extends Controller
                 return $newItem;
             });
 
-            // Filter berdasarkan status
             if ($statusFilter && in_array($statusFilter, ['pending', 'diterima', 'ditolak'])) {
                 $submissionsCollection = $submissionsCollection->filter(fn($item) => ($item->STATUS ?? 'pending') === $statusFilter);
             }
 
-            // Filter berdasarkan rentang tanggal validasi
             if ($startDate && $endDate) {
                 $start = Carbon::parse($startDate)->startOfDay();
                 $end = Carbon::parse($endDate)->endOfDay();

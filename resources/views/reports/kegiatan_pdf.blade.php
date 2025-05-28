@@ -13,6 +13,7 @@
         .header p { margin: 0; font-size: 12px; }
         .filter-info { font-size: 11px; margin-bottom: 10px; }
         .no-data { text-align: center; padding: 20px; font-style: italic; }
+        .sesi-detail { font-size: 9px; white-space: pre-line; } /* Untuk menampilkan tiap sesi di baris baru */
         @page { margin: 20mm 15mm; } /* Margin halaman PDF */
         footer { position: fixed; bottom: -10mm; left: 0px; right: 0px; height: 50px; font-size: 9px; text-align: center; }
     </style>
@@ -51,12 +52,12 @@
                 <tr>
                     <th>No</th>
                     <th>Judul Kegiatan</th>
-                    <th>Tanggal Sesi Awal</th>
-                    <th>Waktu Sesi Awal</th>
+                    <th>Detail Sesi (Tanggal & Waktu)</th>
                     <th>Total Sesi</th>
                     <th>Pemateri Utama</th>
                     <th>Media/Lokasi</th>
-                    <th>Bobot Poin</th>
+                    <th>Bobot Poin (Per Sesi)</th>
+                    <th>Total Peserta Hadir</th>
                 </tr>
             </thead>
             <tbody>
@@ -64,13 +65,22 @@
                     <tr>
                         <td>{{ $index + 1 }}</td>
                         <td>{{ $k->judul_kegiatan ?? ($k->JUDUL_KEGIATAN ?? '-') }}</td>
-                        <td>
-                            {{ $k->jadwal->first() && property_exists($k->jadwal->first(), 'tgl_kegiatan') ? \Carbon\Carbon::parse($k->jadwal->first()->tgl_kegiatan)->translatedFormat('d M Y') : '-' }}
-                        </td>
-                        <td>
-                            {{ $k->jadwal->first() && property_exists($k->jadwal->first(), 'waktu_mulai') ? \Carbon\Carbon::parse($k->jadwal->first()->waktu_mulai)->format('H:i') : '-' }}
-                            @if($k->jadwal->first() && property_exists($k->jadwal->first(), 'waktu_selesai') && $k->jadwal->first()->waktu_selesai)
-                                - {{ \Carbon\Carbon::parse($k->jadwal->first()->waktu_selesai)->format('H:i') }}
+                        <td class="sesi-detail">
+                            @if($k->jadwal->isNotEmpty())
+                                @foreach($k->jadwal as $sesiIndex => $jadwalSesi)
+                                    @php
+                                        $tanggalSesi = property_exists($jadwalSesi, 'tgl_kegiatan') && $jadwalSesi->tgl_kegiatan ? \Carbon\Carbon::parse($jadwalSesi->tgl_kegiatan)->translatedFormat('d M Y') : '';
+                                        $waktuMulai = property_exists($jadwalSesi, 'waktu_mulai') && $jadwalSesi->waktu_mulai ? \Carbon\Carbon::parse($jadwalSesi->waktu_mulai)->format('H:i') : '-';
+                                        $waktuSelesai = property_exists($jadwalSesi, 'waktu_selesai') && $jadwalSesi->waktu_selesai ? \Carbon\Carbon::parse($jadwalSesi->waktu_selesai)->format('H:i') : '';
+                                        $waktuDisplay = $waktuMulai;
+                                        if ($waktuSelesai && $waktuSelesai !== '-') {
+                                            $waktuDisplay .= ' - ' . $waktuSelesai;
+                                        }
+                                    @endphp
+                                    Sesi {{ $sesiIndex + 1 }}: {{ $tanggalSesi }} ({{ $waktuDisplay }})@if(!$loop->last)<br>@endif
+                                @endforeach
+                            @else
+                                -
                             @endif
                         </td>
                         <td>{{ $k->jadwal->count() > 0 ? $k->jadwal->count() : '0' }}</td>
@@ -81,6 +91,9 @@
                         <td style="text-align:center;">
                             {{ $k->jadwal->first() && property_exists($k->jadwal->first(), 'bobot') ? $k->jadwal->first()->bobot : '-' }}
                         </td>
+                        <td style="text-align:center;">
+                            {{ $k->total_peserta_hadir ?? '0' }}
+                        </td>
                     </tr>
                 @endforeach
             </tbody>
@@ -88,13 +101,7 @@
     @endif
     <script type="text/php">
         if (isset($pdf)) {
-            $text = "Halaman {PAGE_NUM} dari {PAGE_COUNT}";
-            $size = 9;
-            $font = $fontMetrics->getFont("DejaVu Sans", "normal");
-            $width = $fontMetrics->get_text_width($text, $font, $size) / 2;
-            $x = ($pdf->get_width() - $width) / 2;
-            $y = $pdf->get_height() - 35;
-            // $pdf->page_text($x, $y, $text, $font, $size); // Tidak perlu jika sudah pakai CSS counter
+            // Script untuk nomor halaman bisa dibiarkan atau disesuaikan jika diperlukan
         }
     </script>
 </body>
