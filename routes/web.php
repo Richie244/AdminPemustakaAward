@@ -8,7 +8,8 @@ use App\Http\Controllers\PemateriController;
 use App\Http\Controllers\AksaraController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PeriodeController;
-use App\Http\Controllers\ReportController; // Tambahkan ini
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\PerusahaanController; // Tambahkan ini
 
 /*
 |--------------------------------------------------------------------------
@@ -44,13 +45,20 @@ Route::resource('kegiatan', KegiatanController::class)->parameters([
     'kegiatan' => 'id'
 ]);
 Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
-Route::get('/report/kegiatan/pdf', [ReportController::class, 'generateKegiatanReportPdf'])->name('report.kegiatan.pdf'); // Rute baru
+Route::get('/report/kegiatan/pdf', [ReportController::class, 'generateKegiatanReportPdf'])->name('report.kegiatan.pdf');
 
-// Contoh routes untuk Master Pemateri
+// --- Route Master Pemateri ---
 Route::get('/pemateri', [PemateriController::class, 'index'])->name('master-pemateri.index');
 Route::get('/pemateri/create', [PemateriController::class, 'create'])->name('master-pemateri.create');
 Route::post('/pemateri', [PemateriController::class, 'store'])->name('master-pemateri.store');
 Route::delete('/pemateri/{pemateri}', [PemateriController::class, 'destroy'])->name('master-pemateri.destroy');
+
+// --- Route Master Perusahaan ---
+Route::get('/perusahaan', [PerusahaanController::class, 'index'])->name('master-perusahaan.index');
+Route::get('/perusahaan/create', [PerusahaanController::class, 'create'])->name('master-perusahaan.create');
+Route::post('/perusahaan', [PerusahaanController::class, 'store'])->name('master-perusahaan.store');
+Route::delete('/perusahaan/{perusahaan}', [PerusahaanController::class, 'destroy'])->name('master-perusahaan.destroy');
+
 
 // --- Route Periode ---
 Route::get('/periode', [App\Http\Controllers\PeriodeController::class, 'index'])->name('periode.index');
@@ -64,9 +72,11 @@ Route::prefix('validasi-aksara')->name('validasi.aksara.')->group(function () {
     Route::get('/{id}/detail', [AksaraController::class, 'show'])->name('detail');
     Route::post('/{id}/setuju', [AksaraController::class, 'setuju'])->name('setuju');
     Route::post('/{id}/tolak', [AksaraController::class, 'tolak'])->name('tolak');
-    Route::get('/report/pdf', [ReportController::class, 'generateAksaraReportPdf'])->name('report.pdf'); // Rute baru
+    Route::get('/report/pdf', [ReportController::class, 'generateAksaraReportPdf'])->name('report.pdf');
 });
 
 // --- Route Generate Sertifikat ---
 Route::get('/sertifikat/generate/kegiatan/{idKegiatan}/peserta/{nim}/{peran?}', [SertifikatGeneratorController::class, 'generateUntukKegiatanSatu'])
     ->name('sertifikat.generate.peserta');
+
+// }); // Akhir grup middleware

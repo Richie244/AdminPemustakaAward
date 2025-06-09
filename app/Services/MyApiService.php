@@ -27,7 +27,7 @@ class MyApiService
         $this->httpClient = Http::baseUrl($baseUrl)
             ->timeout(30)
             ->retry(3, 100, function ($exception, $request) {
-                return $exception instanceof \Illuminate\Http\Client\ConnectionException || 
+                return $exception instanceof \Illuminate\Http\Client\ConnectionException ||
                        ($exception instanceof \Illuminate\Http\Client\RequestException && $exception->response && $exception->response->status() >= 500);
             });
 
@@ -51,9 +51,8 @@ class MyApiService
             'pematerikegiatan_pust'     => 'ID_PEMATERI',
             'pemateri'                  => 'ID_PEMATERI',
             'pemateri-kegiatan'         => 'ID_PEMATERI',
-            'perusahaan_pemateri_pust'  => 'ID_PERUSAHAAN',
-            'perusahaan-pemateri'       => 'ID_PERUSAHAAN',
-            'perusahaan'                => 'ID_PERUSAHAAN',
+            'perusahaan_pemateri_pust'  => 'ID_PERUSAHAAN', // Alias untuk endpoint perusahaan di PemateriController
+            'perusahaan'                => 'ID_PERUSAHAAN', // Untuk CRUD Perusahaan murni
             'jadwal-kegiatan'           => 'ID_JADWAL',
             'hadir-kegiatan'            => 'ID_HADIR',
             'aksara-dinamika'           => 'ID_AKSARA_DINAMIKA',
@@ -69,7 +68,10 @@ class MyApiService
     public function getPrimaryKeyName(string $endpointName): string
     {
         $cleanedEndpointName = last(explode('/', strtolower(trim($endpointName))));
-        $mappedKey = $this->primaryKeyMap[$cleanedEndpointName] ?? $this->primaryKeyMap['default'];
+        // Prioritaskan mapping yang lebih spesifik jika ada
+        $mappedKey = $this->primaryKeyMap[$cleanedEndpointName] ??
+                     $this->primaryKeyMap[str_replace('-', '_', $cleanedEndpointName)] ?? // coba dengan underscore
+                     $this->primaryKeyMap['default'];
         Log::debug("[MyApiService::getPrimaryKeyName] Endpoint: '{$endpointName}' -> Cleaned: '{$cleanedEndpointName}' -> Mapped PK: '{$mappedKey}'");
         return $mappedKey;
     }
@@ -91,14 +93,22 @@ class MyApiService
                 '_json_error_data' => $response->json() ?? ['message' => 'API request failed with status ' . $response->status() . '. No JSON body.', 'details' => Str::limit($response->body(), 200)]
             ];
         }
-        
-        if ($response->successful() && empty(trim($response->body()))) {
-            Log::info("{$errorMessagePrefix}: Response sukses namun body kosong.", ['url' => $response->effectiveUri()->__toString(), 'status' => $response->status()]);
-            return [
-                '_success_no_content' => true,
-                '_status' => $response->status()
-            ];
+
+        if ($response->successful() && empty(trim($response->body())) && $response->status() !== 204) { // Allow 204 No Content
+            Log::info("{$errorMessagePrefix}: Response sukses namun body kosong (status: {$response->status()}).", ['url' => $response->effectiveUri()->__toString()]);
+            // Untuk POST/PUT/DELETE yang sukses tanpa content, ini bisa jadi normal
+            if (in_array(strtoupper($response->transferStats->getRequest()->getMethod()), ['POST', 'PUT', 'DELETE', 'PATCH'])) {
+                 return ['_success_no_content' => true, '_status' => $response->status()];
+            }
+            // Untuk GET, body kosong mungkin berarti tidak ada data, tapi bukan error
+            // Kembalikan array kosong agar bisa diiterasi
+            return [];
         }
+         if ($response->status() === 204) { // Handle 204 No Content specifically
+            Log::info("{$errorMessagePrefix}: Response sukses dengan status 204 No Content.", ['url' => $response->effectiveUri()->__toString()]);
+            return ['_success_no_content' => true, '_status' => $response->status()];
+        }
+
 
         $jsonData = $response->json();
         if ($jsonData === null && !empty(trim($response->body()))) {
@@ -114,12 +124,14 @@ class MyApiService
                 '_message' => 'Response body bukan JSON valid.'
             ];
         }
-        
-        if (is_array($jsonData) && (empty($jsonData) || isset($jsonData[0])) && !collect($jsonData)->has('data')) {
-            Log::debug("{$errorMessagePrefix}: API mengembalikan array langsung (tidak dibungkus 'data'). Menggunakan array tersebut sebagai data.", ['url' => $response->effectiveUri()->__toString()]);
-            return $jsonData; 
+
+        // Jika API mengembalikan array langsung (tidak dibungkus 'data' atau key lain)
+        // dan array tersebut tidak kosong ATAU merupakan array kosong (yang valid)
+        if (is_array($jsonData) && (isset($jsonData[0]) || empty($jsonData)) && !collect($jsonData)->has(['data', 'success', 'message'])) {
+            Log::debug("{$errorMessagePrefix}: API mengembalikan array langsung. Menggunakan array tersebut sebagai data.", ['url' => $response->effectiveUri()->__toString(), 'count' => count($jsonData)]);
+            return $jsonData;
         }
-        
+
         return $jsonData;
     }
 
@@ -157,17 +169,18 @@ class MyApiService
             if (isset($apiResponse['data']) && is_array($apiResponse['data'])) {
                 $itemsToIterate = $apiResponse['data'];
                 Log::debug("[SERVICE_GET_NEXT_ID] Extracted items from 'data' key for '{$endpoint}'. Count: " . count($itemsToIterate));
-            } elseif (is_array($apiResponse)) {
+            } elseif (is_array($apiResponse)) { // Jika API langsung mengembalikan array
                 $itemsToIterate = $apiResponse;
                  Log::debug("[SERVICE_GET_NEXT_ID] Using direct API response as items for '{$endpoint}'. Count: " . count($itemsToIterate));
             } else {
                 Log::warning("[SERVICE_GET_NEXT_ID] Response for '{$endpoint}' is not an array and not 'data' wrapped. Assuming empty.", ['response_preview' => Str::limit(json_encode($apiResponse), 200)]);
             }
 
-            if (empty($itemsToIterate)) {
+            if (empty($itemsToIterate) && is_array($itemsToIterate)) { // Pastikan $itemsToIterate adalah array sebelum dihitung
                 Log::info("[SERVICE_GET_NEXT_ID] No items found for '{$endpoint}' after extracting. Starting ID from {$defaultId}.");
                 return $defaultId;
             }
+
 
             $maxId = 0;
             foreach ($itemsToIterate as $keyItem => $item) {
@@ -176,14 +189,14 @@ class MyApiService
                     continue;
                 }
                 $itemObject = (object) $item;
-                
+
                 $currentId = null;
                 $possibleKeys = array_unique([
-                    $idColumnName,
+                    $idColumnName, // Kunci dari mapping
                     strtoupper($idColumnName),
                     strtolower($idColumnName),
-                    'id', 
-                    'ID'
+                    'id', // Fallback umum
+                    'ID'  // Fallback umum
                 ]);
                 Log::debug("[SERVICE_GET_NEXT_ID] Item " . ($keyItem+1) . " for '{$endpoint}'. Possible PK keys to check: " . implode(', ', $possibleKeys), (array)$itemObject);
 
@@ -193,13 +206,13 @@ class MyApiService
                         if (is_numeric($value)) {
                             $currentId = (int) $value;
                             Log::debug("[SERVICE_GET_NEXT_ID] Found ID {$currentId} using key '{$key}' in item " . ($keyItem+1) . " for '{$endpoint}'.");
-                            break; 
+                            break;
                         } else {
                              Log::debug("[SERVICE_GET_NEXT_ID] Found key '{$key}' but value '{$value}' is not numeric in item " . ($keyItem+1) . " for '{$endpoint}'.");
                         }
                     }
                 }
-                
+
                 if ($currentId === null) {
                     Log::warning("[SERVICE_GET_NEXT_ID] Could not find a valid numeric ID in item " . ($keyItem+1) . " for '{$endpoint}'. Item dump:", (array)$itemObject);
                 }
@@ -222,54 +235,68 @@ class MyApiService
         return null;
     }
 
+    // Periode
     public function getPeriodeList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('periode', $params), 'Gagal mengambil daftar periode');
     }
     public function createPeriode(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('periode', $data), 'Gagal membuat periode');
     }
+
+    // Range Kunjungan
     public function getRangeKunjunganList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('range-kunjungan', $params), 'Gagal mengambil daftar range kunjungan');
     }
     public function createRangeKunjungan(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('range-kunjungan', $data), 'Gagal membuat range kunjungan');
     }
+
+    // Reward
     public function getRewardList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('reward', $params), 'Gagal mengambil daftar reward');
     }
     public function createReward(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('reward', $data), 'Gagal membuat reward');
     }
+
+    // Pembobotan
     public function getPembobotanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('pembobotan', $params), 'Gagal mengambil daftar pembobotan');
     }
     public function createPembobotan(array $data): ?array {
         return $this->handleResponse($this->httpClient->asJson()->post('pembobotan', $data), 'Gagal membuat pembobotan');
     }
-    public function getPemateriList(array $params = []): ?array { 
-        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar master pemateri (endpoint /pemateri)');
+
+    // Pemateri (Master)
+    public function getPemateriList(array $params = []): ?array {
+        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar master pemateri (endpoint /pemateri-kegiatan)');
     }
     public function createPemateri(array $data): ?array {
-        Log::info('[MyApiService] createPemateri data:', $data);
+        Log::info('[MyApiService] createPemateri data (to /pemateri-kegiatan):', $data);
         return $this->handleResponse($this->httpClient->asJson()->post('pemateri-kegiatan', $data), 'Gagal membuat pemateri');
     }
-
     public function deletePemateri(string $id): ?array {
-        Log::info("[MyApiService] Menghapus pemateri dengan ID: {$id}");
+        Log::info("[MyApiService] Menghapus pemateri dengan ID: {$id} (from /pemateri-kegiatan)");
         return $this->handleResponse($this->httpClient->delete("pemateri-kegiatan/{$id}"), "Gagal menghapus pemateri ID: {$id}");
     }
 
-    public function getPerusahaanPemateriList(array $params = []): ?array { 
-        Log::info('[MyApiService] Mengambil daftar perusahaan pemateri dari endpoint /perusahaan');
+    // Perusahaan Pemateri (digunakan oleh PemateriController dan PerusahaanController)
+    public function getPerusahaanPemateriList(array $params = []): ?array {
+        Log::info('[MyApiService] Mengambil daftar perusahaan dari endpoint /perusahaan');
         $response = $this->httpClient->get('perusahaan', $params);
-        return $this->handleResponse($response, 'Gagal mengambil daftar perusahaan pemateri');
+        return $this->handleResponse($response, 'Gagal mengambil daftar perusahaan');
     }
-
     public function createPerusahaanPemateri(array $data): ?array {
-        Log::info('[MyApiService] createPerusahaanPemateri data:', $data);
-        return $this->handleResponse($this->httpClient->asJson()->post('perusahaan', $data), 'Gagal membuat perusahaan pemateri');
+        Log::info('[MyApiService] createPerusahaanPemateri data (to /perusahaan):', $data);
+        return $this->handleResponse($this->httpClient->asJson()->post('perusahaan', $data), 'Gagal membuat perusahaan');
+    }
+    public function deletePerusahaanPemateri(string $id): ?array { // Method baru untuk delete perusahaan
+        Log::info("[MyApiService] Menghapus perusahaan dengan ID: {$id} (from /perusahaan)");
+        return $this->handleResponse($this->httpClient->delete("perusahaan/{$id}"), "Gagal menghapus perusahaan ID: {$id}");
     }
 
+
+    // Kegiatan
     public function getKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('kegiatan', $params), 'Gagal mengambil daftar kegiatan');
     }
@@ -282,6 +309,8 @@ class MyApiService
     public function deleteKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("kegiatan/{$id}"), "Gagal menghapus kegiatan ID: {$id}");
     }
+
+    // Jadwal Kegiatan
     public function getJadwalKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('jadwal-kegiatan', $params), 'Gagal mengambil daftar jadwal kegiatan');
     }
@@ -291,9 +320,13 @@ class MyApiService
     public function deleteJadwalKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("jadwal-kegiatan/{$id}"), "Gagal menghapus jadwal kegiatan ID: {$id}");
     }
-    public function getPemateriKegiatanList(array $params = []): ?array { 
-        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri (endpoint pemateri-kegiatan)');
+
+    // Pemateri Kegiatan (List untuk KegiatanController, mungkin sama dengan getPemateriList)
+    public function getPemateriKegiatanList(array $params = []): ?array {
+        return $this->handleResponse($this->httpClient->get('pemateri-kegiatan', $params), 'Gagal mengambil daftar pemateri untuk kegiatan (endpoint /pemateri-kegiatan)');
     }
+
+    // Sertifikat
     public function getSertifikatList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('sertifikat', $params), 'Gagal mengambil daftar sertifikat');
     }
@@ -303,15 +336,21 @@ class MyApiService
     public function deleteSertifikat(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("sertifikat/{$id}"), "Gagal menghapus sertifikat ID: {$id}");
     }
+
+    // Hadir Kegiatan
     public function getHadirKegiatanList(array $params = []): ?array {
         return $this->handleResponse($this->httpClient->get('hadir-kegiatan', $params), 'Gagal mengambil daftar hadir kegiatan');
     }
     public function deleteHadirKegiatan(string $id): ?array {
         return $this->handleResponse($this->httpClient->delete("hadir-kegiatan/{$id}"), "Gagal menghapus hadir kegiatan ID: {$id}");
     }
+
+    // Aksara Dinamika
     public function getAksaraDinamikaList(array $queryParams = []): ?array {
         return $this->handleResponse($this->httpClient->get('aksara-dinamika', $queryParams),'Gagal mengambil daftar Aksara Dinamika');
     }
+
+    // Histori Status Aksara
     public function createAksaraHistoriStatus(array $data): ?array {
         Log::info('[SERVICE_CREATE_HISTORI_STATUS] Mengirim data ke API /histori-status:', $data);
         return $this->handleResponse($this->httpClient->asJson()->post('histori-status', $data), 'Gagal membuat histori status Aksara Dinamika');
@@ -325,6 +364,8 @@ class MyApiService
         }
         return $handledResponse;
     }
+
+    // Civitas
     public function getCivitasList(array $queryParams = []): ?array {
         return $this->handleResponse($this->httpClient->get('civitas', $queryParams),'Gagal mengambil daftar Civitas');
     }
