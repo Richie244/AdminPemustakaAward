@@ -6,13 +6,22 @@
     <title>@yield('title', config('app.name', 'Laravel'))</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    {{-- Pastikan Alpine.js dimuat di sini atau di akhir body --}}
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     
+    {{-- TAMBAHKAN SCRIPT & STYLE DI BAWAH INI --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-
+    
+    {{-- JQuery (diperlukan oleh Select2) --}}
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    {{-- Select2 CSS --}}
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    
+    {{-- Select2 JS --}}
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -24,10 +33,25 @@
         .sidebar { height: 100vh; overflow-y: auto; }
         .nav-item { transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, padding-left 0.2s ease-in-out; }
         .nav-item:hover:not(.bg-blue-600) { background-color: #2D3748; }
-        [x-cloak] { display: none !important; } /* Pastikan ini ada */
+        [x-cloak] { display: none !important; }
+        
+        /* Tambahan style agar Select2 cocok dengan Tailwind */
+        .select2-container--default .select2-selection--single {
+            border: 1px solid #d1d5db; /* border-gray-300 */
+            border-radius: 0.375rem; /* rounded-md */
+            height: 2.625rem; /* Sesuaikan tinggi agar sama dengan input lain */
+            padding: 0.5rem 0.75rem;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 2.5rem;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 1.625rem;
+        }
     </style>
     @stack('styles')
 </head>
+{{-- sisa file body tidak berubah --}}
 <body class="bg-gray-100">
     <div class="flex h-screen">
         {{-- Sidebar --}}

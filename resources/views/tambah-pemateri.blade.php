@@ -1,3 +1,5 @@
+{{-- resources/views/tambah-pemateri.blade.php --}}
+
 @extends('layouts.app')
 
 @section('title', 'Tambah Master Pemateri')
@@ -69,22 +71,32 @@
                 {{-- Pilihan Perusahaan --}}
                 <div>
                     <label for="id_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Asal Perusahaan/Instansi <span class="text-red-500">*</span></label>
-                    <select name="id_perusahaan" id="id_perusahaan"
-                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm @error('id_perusahaan') border-red-500 @enderror"
-                            required {{ ($perusahaanList && $perusahaanList->isEmpty() && $error_message_perusahaan) || ($error_message_perusahaan && !$perusahaanList) ? 'disabled' : '' }}>
-                        <option value="">-- Pilih Perusahaan --</option>
-                        @if ($perusahaanList && $perusahaanList->isNotEmpty())
-                            @foreach ($perusahaanList as $perusahaan)
-                                <option value="{{ $perusahaan->id_perusahaan }}" {{ old('id_perusahaan') == $perusahaan->id_perusahaan ? 'selected' : '' }}>
-                                    {{ $perusahaan->nama_perusahaan }}
-                                </option>
-                            @endforeach
-                        @endif
-                    </select>
+                    <div class="flex items-center gap-2 mt-1">
+                        {{-- Atribut style="width: 100%;" ditambahkan untuk kompatibilitas Select2 --}}
+                        <select name="id_perusahaan" id="id_perusahaan" style="width: 100%;"
+                                class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 sm:text-sm @error('id_perusahaan') border-red-500 @enderror"
+                                required {{ ($perusahaanList && $perusahaanList->isEmpty() && $error_message_perusahaan) || ($error_message_perusahaan && !$perusahaanList) ? 'disabled' : '' }}>
+                            <option value="">-- Pilih Perusahaan --</option>
+                            @if ($perusahaanList && $perusahaanList->isNotEmpty())
+                                @foreach ($perusahaanList as $perusahaan)
+                                    <option value="{{ $perusahaan->id_perusahaan }}" {{ old('id_perusahaan') == $perusahaan->id_perusahaan ? 'selected' : '' }}>
+                                        {{ $perusahaan->nama_perusahaan }}
+                                    </option>
+                                @endforeach
+                            @endif
+                        </select>
+                        <a href="{{ route('master-perusahaan.create') }}" target="_blank"
+                           class="flex-shrink-0 bg-green-500 hover:bg-green-600 text-white p-2.5 rounded-md shadow-sm transition-colors"
+                           title="Tambah Perusahaan Baru">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                            </svg>
+                        </a>
+                    </div>
                     @if (($perusahaanList && $perusahaanList->isEmpty() && $error_message_perusahaan) || ($error_message_perusahaan && !$perusahaanList))
                          <p class="mt-1 text-xs text-yellow-700">Tidak dapat memuat daftar perusahaan. Pilihan dinonaktifkan.</p>
                     @elseif ($perusahaanList && $perusahaanList->isEmpty() && !$error_message_perusahaan)
-                         <p class="mt-1 text-xs text-gray-500">Tidak ada data perusahaan tersedia untuk dipilih.</p>
+                         <p class="mt-1 text-xs text-gray-500">Tidak ada data perusahaan tersedia. Gunakan tombol `+` untuk menambah.</p>
                     @endif
                     @error('id_perusahaan')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
@@ -111,14 +123,13 @@
 @endsection
 
 @push('scripts')
-{{-- Script tambahan jika ada, misalnya untuk select2 jika daftar perusahaan banyak --}}
-{{-- <script>
-    // Contoh jika Anda menggunakan Select2 untuk dropdown perusahaan
-    // $(document).ready(function() {
-    //     $('#id_perusahaan').select2({
-    //         placeholder: "-- Pilih Perusahaan --",
-    //         allowClear: true // Jika Anda ingin mengizinkan "Tanpa Afiliasi" dengan memilih opsi kosong
-    //     });
-    // });
-</script> --}}
+{{-- Script untuk mengaktifkan Select2 --}}
+<script>
+    $(document).ready(function() {
+        $('#id_perusahaan').select2({
+            placeholder: "-- Cari dan Pilih Perusahaan --",
+            allowClear: true
+        });
+    });
+</script>
 @endpush

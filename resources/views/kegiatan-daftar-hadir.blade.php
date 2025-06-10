@@ -18,11 +18,25 @@
 
         {{-- Card Utama --}}
         <div class="bg-white p-6 sm:p-8 shadow-xl rounded-2xl">
-            <div class="mb-6 pb-4 border-b border-gray-200">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
-                    Daftar Hadir: {{ $kegiatan->judul_kegiatan ?? ($kegiatan->JUDUL_KEGIATAN ?? 'Kegiatan Tidak Diketahui') }}
-                </h1>
-                <p class="text-sm text-gray-500">ID Kegiatan: {{ $kegiatan->id_kegiatan ?? ($kegiatan->ID_KEGIATAN ?? 'N/A') }}</p>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200">
+                <div class="flex-grow">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
+                        Daftar Hadir: {{ $kegiatan->judul_kegiatan ?? ($kegiatan->JUDUL_KEGIATAN ?? 'Kegiatan Tidak Diketahui') }}
+                    </h1>
+                    <p class="text-sm text-gray-500">ID Kegiatan: {{ $kegiatan->id_kegiatan ?? ($kegiatan->ID_KEGIATAN ?? 'N/A') }}</p>
+                </div>
+                {{-- TOMBOL BARU DITAMBAHKAN DI SINI --}}
+                @php
+                    $idKegiatanRoute = $kegiatan->id_kegiatan ?? ($kegiatan->ID_KEGIATAN ?? null);
+                @endphp
+                @if($idKegiatanRoute)
+                <a href="{{ route('report.kegiatan.daftar-hadir.pdf', ['idKegiatan' => $idKegiatanRoute]) }}"
+                   target="_blank"
+                   class="bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2 transition-all duration-150 ease-in-out transform hover:scale-105 text-sm sm:text-base w-full sm:w-auto justify-center mt-4 sm:mt-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625a1.875 1.875 0 00-1.875 1.875v17.25a1.875 1.875 0 001.875 1.875h12.75a1.875 1.875 0 001.875-1.875V11.25a9 9 0 00-9-9z"></path></svg>
+                    Report PDF
+                </a>
+                @endif
             </div>
 
             @if($jadwalDenganKehadiran->isEmpty())

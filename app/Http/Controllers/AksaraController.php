@@ -38,26 +38,33 @@ class AksaraController extends Controller
 
     public function index(Request $request)
     {
-        $statusFilter = $request->input('status'); // Akan berisi 'pending', 'diterima', atau 'ditolak'
+        $statusFilter = $request->input('status');
         $searchTerm = rawurldecode($request->input('search', ''));
         $submissionsCollection = new Collection();
+        $latestHistories = new Collection();
 
         Log::info('[AKSARA_INDEX_START] Memulai proses pengambilan data. Filter Status: ' . $statusFilter);
 
         try {
+            // 1. Ambil data submisi Aksara Dinamika
             $responseSubmissions = $this->apiService->getAksaraDinamikaList();
-            if (!$responseSubmissions || isset($responseSubmissions['_error'])) {
-                Log::error('[AKSARA_INDEX_ERROR] Gagal mengambil data Aksara Dinamika.', $responseSubmissions ?? []);
-                return back()->withErrors(['api_error' => 'Gagal memuat data Aksara Dinamika.']);
+            // **PERBAIKAN:** Cek error, jika tidak ada, pastikan hasilnya array. Jika tidak, buat jadi array kosong.
+            if (isset($responseSubmissions['_error'])) {
+                Log::error('[AKSARA_INDEX_ERROR] Gagal mengambil data Aksara Dinamika.', $responseSubmissions);
+                $responseSubmissions = []; // Lanjutkan dengan array kosong untuk mencegah error
+                session()->flash('error', 'Gagal memuat data submisi dari server.');
+            } elseif (!is_array($responseSubmissions)) {
+                Log::warning('[AKSARA_INDEX_WARNING] Respons data Aksara Dinamika bukan array.', ['response' => $responseSubmissions]);
+                $responseSubmissions = []; // Jadikan array kosong jika format tidak sesuai
             }
-            if (empty($responseSubmissions) && !is_array($responseSubmissions)) {
-                $responseSubmissions = [];
-            }
-
+            
+            // 2. Ambil data histori status
             $responseHistoriStatus = $this->apiService->readHistoriStatus();
-            $latestHistories = new Collection();
-
-            if ($responseHistoriStatus && !isset($responseHistoriStatus['_error']) && is_array($responseHistoriStatus)) {
+            // **PERBAIKAN:** Terapkan logika yang sama untuk data histori
+            if (isset($responseHistoriStatus['_error'])) {
+                Log::error('[AKSARA_INDEX_ERROR] Gagal mengambil data Histori Status.', $responseHistoriStatus);
+                // Biarkan $latestHistories tetap kosong
+            } elseif (is_array($responseHistoriStatus)) {
                 $allHistoriStatus = collect($responseHistoriStatus)->map(function($historiItem){
                     $h = (object) $historiItem;
                     $h->id_aksara_dinamika_histori = (string) ($h->id_aksara_dinamika ?? $h->ID_AKSARA_DINAMIKA ?? null);
@@ -72,18 +79,20 @@ class AksaraController extends Controller
                 $latestHistories = $allHistoriStatus
                     ->filter(fn($h) => $h->id_aksara_dinamika_histori !== null && $h->tgl_status_parsed !== null)
                     ->groupBy('id_aksara_dinamika_histori')
-                    ->map(function (Collection $historiesForOneAksara) {
-                        return $historiesForOneAksara->sortByDesc('tgl_status_parsed')->first();
-                    });
-            } else {
-                Log::warning('[AKSARA_INDEX_WARNING] Gagal mengambil data Histori Status.', $responseHistoriStatus ?? []);
+                    ->map(fn(Collection $historiesForOneAksara) => $historiesForOneAksara->sortByDesc('tgl_status_parsed')->first());
             }
 
+            // 3. Proses dan gabungkan data
             $submissionsCollection = collect($responseSubmissions)->map(function($itemArray) use ($latestHistories) {
                 $item = (object) $itemArray;
                 $newItem = new \stdClass();
                 $currentAksaraId = (string) ($item->id_aksara_dinamika ?? $item->ID_AKSARA_DINAMIKA ?? null);
                 
+                // Jika tidak ada ID, lewati item ini
+                if ($currentAksaraId === null) {
+                    return null;
+                }
+
                 $newItem->id = $currentAksaraId;
                 $newItem->JUDUL = $item->judul ?? $item->JUDUL ?? ('ID Buku: ' . ($item->id_buku ?? $item->ID_BUKU ?? 'N/A'));
                 $newItem->NAMA = $item->nama ?? $item->NAMA ?? ('NIM: ' . ($item->nim ?? $item->NIM ?? 'N/A'));
@@ -92,35 +101,17 @@ class AksaraController extends Controller
 
                 if ($latestHistoryEntry) {
                     $newItem->STATUS = $latestHistoryEntry->status_histori;
-                    $newItem->ALASAN_PENOLAKAN = $latestHistoryEntry->keterangan_histori ?? null;
-                    $newItem->VALIDATOR_ID = $latestHistoryEntry->user_pust_status_histori ?? null;
-                    $newItem->TGL_VALIDASI = $latestHistoryEntry->tgl_status_parsed ? $latestHistoryEntry->tgl_status_parsed->translatedFormat('d F Y H:i') : null;
                 } else {
-                    $newItem->STATUS = strtolower(
-                        $item->status_validasi ??
-                        $item->STATUS_VALIDASI ??
-                        $item->submission_status ??
-                        'pending'
-                    );
-                    $newItem->ALASAN_PENOLAKAN = $item->alasan_penolakan ??
-                                               $item->ALASAN_PENOLAKAN ??
-                                               null;
-                    $newItem->VALIDATOR_ID = null;
-                    $newItem->TGL_VALIDASI = null;
+                    $newItem->STATUS = strtolower($item->status_validasi ?? $item->STATUS_VALIDASI ?? 'pending');
                 }
                 
                 $newItem->NIM = $item->nim ?? $item->NIM ?? null;
-                $newItem->ID_BUKU = $item->id_buku ?? $item->ID_BUKU ?? null;
-                $newItem->INDUK_BUKU = $item->induk_buku ?? $item->INDUK_BUKU ?? null;
-                $newItem->REVIEW = $item->review ?? $item->REVIEW ?? null;
-                $newItem->DOSEN_USULAN = $item->dosen_usulan ?? $item->DOSEN_USULAN ?? null;
-                $newItem->LINK_UPLOAD = $item->link_upload ?? $item->LINK_UPLOAD ?? null;
                 $newItem->PENGARANG = $item->pengarang1 ?? $item->PENGARANG1 ?? null;
-                $newItem->EMAIL = $item->email ?? null;
  
                 return $newItem;
-            });
+            })->filter(); // filter() tanpa argumen akan menghapus item yang null
 
+            // Lanjutkan filtering dan sorting seperti biasa
             if ($searchTerm) {
                 $submissionsCollection = $submissionsCollection->filter(function ($item) use ($searchTerm) {
                     return stripos($item->JUDUL ?? '', $searchTerm) !== false ||
@@ -140,9 +131,12 @@ class AksaraController extends Controller
 
         } catch (\Exception $e) {
             Log::error('[AKSARA_INDEX_EXCEPTION] Exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-             return back()->withErrors(['api_error' => 'Terjadi kesalahan: ' . $e->getMessage()]);
+            // Jangan `back()->withErrors`, tapi siapkan variabel untuk ditampilkan di view
+            session()->flash('error', 'Terjadi kesalahan sistem saat memuat data validasi.');
+            // Biarkan $submissionsCollection tetap kosong
         }
 
+        // Paginate hasil akhir
         $submissions = $this->paginate(
             $submissionsCollection, 10, null,
             ['path' => route('validasi.aksara.index')]
@@ -155,7 +149,8 @@ class AksaraController extends Controller
             'searchTerm' => $searchTerm
         ]);
     }
-
+    
+    // ... method show, setuju, tolak tidak perlu diubah ...
     public function show($id)
     {
         Log::info("[AKSARA_SHOW] Attempting to show submission for ID: {$id}");

@@ -30,9 +30,6 @@ Route::get('/login', [LoginController::class, 'viewLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-// --- Grup Route yang Memerlukan Autentikasi ---
-// Route::middleware(['auth.custom'])->group(function () { // Sesuaikan dengan middleware Anda
-
 // --- Route Sertifikat Template ---
 Route::resource('sertifikat-templates', SertifikatTemplateController::class)->only([
     'index',
@@ -46,6 +43,7 @@ Route::resource('kegiatan', KegiatanController::class)->parameters([
 ]);
 Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
 Route::get('/report/kegiatan/pdf', [ReportController::class, 'generateKegiatanReportPdf'])->name('report.kegiatan.pdf');
+Route::get('/report/kegiatan/{idKegiatan}/daftar-hadir/pdf', [ReportController::class, 'generateDaftarHadirReportPdf'])->name('report.kegiatan.daftar-hadir.pdf');
 
 // --- Route Master Pemateri ---
 Route::get('/pemateri', [PemateriController::class, 'index'])->name('master-pemateri.index');
@@ -78,5 +76,3 @@ Route::prefix('validasi-aksara')->name('validasi.aksara.')->group(function () {
 // --- Route Generate Sertifikat ---
 Route::get('/sertifikat/generate/kegiatan/{idKegiatan}/peserta/{nim}/{peran?}', [SertifikatGeneratorController::class, 'generateUntukKegiatanSatu'])
     ->name('sertifikat.generate.peserta');
-
-// }); // Akhir grup middleware

@@ -8,6 +8,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
 
 class ReportController extends Controller
 {
@@ -214,5 +215,76 @@ class ReportController extends Controller
 
         $pdf = Pdf::loadView('reports.aksara_pdf', $data)->setPaper('a4', 'landscape');
         return $pdf->download('laporan_aksara_dinamika_'.date('YmdHis').'.pdf');
+    }
+
+        public function generateDaftarHadirReportPdf(Request $request, $idKegiatan)
+    {
+        Log::info("[REPORT_DAFTAR_HADIR_PDF] Generate PDF untuk ID Kegiatan: {$idKegiatan}");
+
+        try {
+            // 1. Ambil data kegiatan
+            $kegiatanListResult = $this->apiService->getKegiatanList();
+            if (!$kegiatanListResult || isset($kegiatanListResult['_error'])) {
+                throw new \Exception("Gagal mengambil data kegiatan.");
+            }
+            $kegiatan = collect($kegiatanListResult)->first(function ($item) use ($idKegiatan) {
+                $k = (object) $item;
+                return ($k->id_kegiatan ?? $k->ID_KEGIATAN ?? null) == $idKegiatan;
+            });
+
+            if (!$kegiatan) {
+                return response("Kegiatan dengan ID {$idKegiatan} tidak ditemukan.", 404);
+            }
+            $kegiatan = (object) $kegiatan;
+
+            // 2. Ambil semua jadwal, kehadiran, dan data civitas (untuk nama)
+            $allJadwalResult = $this->apiService->getJadwalKegiatanList();
+            $allJadwal = ($allJadwalResult && !isset($allJadwalResult['_error'])) ? collect($allJadwalResult)->map(fn($j) => (object)$j) : collect();
+
+            $allHadirResult = $this->apiService->getHadirKegiatanList();
+            $allHadirKegiatan = ($allHadirResult && !isset($allHadirResult['_error'])) ? collect($allHadirResult)->map(fn($h) => (object)$h) : collect();
+
+            $allCivitasResult = $this->apiService->getCivitasList();
+            $allCivitas = ($allCivitasResult && !isset($allCivitasResult['_error'])) ? collect($allCivitasResult)->keyBy('id_civitas') : collect();
+
+            // 3. Proses dan gabungkan data
+            $jadwalUntukKegiatanIni = $allJadwal->filter(fn($j) => ($j->id_kegiatan ?? $j->ID_KEGIATAN ?? null) == $idKegiatan)
+                ->sortBy(function($j) {
+                    try { return Carbon::parse($j->tgl_kegiatan . ' ' . $j->waktu_mulai)->timestamp; } catch (\Exception $e) { return 0; }
+                })
+                ->values();
+
+            $jadwalDenganKehadiranDanNama = $jadwalUntukKegiatanIni->map(function ($jadwal) use ($allHadirKegiatan, $allCivitas) {
+                $idJadwalIni = $jadwal->id_jadwal ?? $jadwal->id ?? null;
+                $kehadiran = $allHadirKegiatan->where('id_jadwal', (string)$idJadwalIni);
+                
+                $jadwal->peserta = $kehadiran->map(function ($hadir) use ($allCivitas) {
+                    $nim = $hadir->nim ?? null;
+                    $nama = $allCivitas->get($nim)['nama'] ?? 'Nama tidak ditemukan';
+                    return (object)['nim' => $nim, 'nama' => $nama];
+                })->filter(fn($p) => $p->nim)->values();
+
+                return $jadwal;
+            });
+            
+            // 4. Siapkan data untuk view PDF
+            $data = [
+                'title' => 'Laporan Daftar Hadir',
+                'date' => date('d M Y'),
+                'kegiatan' => $kegiatan,
+                'jadwalDenganKehadiran' => $jadwalDenganKehadiranDanNama,
+            ];
+
+            // 5. Generate PDF
+            $pdf = Pdf::loadView('reports.daftar_hadir_kegiatan_pdf', $data)->setPaper('a4', 'portrait');
+            $namaFile = 'daftar_hadir_' . \Illuminate\Support\Str::slug($kegiatan->judul_kegiatan ?? 'kegiatan') . '_' . date('YmdHis') . '.pdf';
+            
+            return $pdf->download($namaFile);
+
+        } catch (\Exception $e) {
+            Log::error("[REPORT_DAFTAR_HADIR_PDF] Exception: " . $e->getMessage());
+            // Mengembalikan pesan error yang lebih informatif ke browser
+            return response("Error saat generate PDF: " . $e->getMessage(), 500);
+        }
     }
 }

@@ -593,45 +593,80 @@ class KegiatanController extends Controller
         return redirect()->route('kegiatan.index')->withErrors(['api_error' => 'Gagal menghapus kegiatan atau beberapa data terkait. ' . implode('; ', $errors)]);
     }
 
-    public function daftarHadir(string $idKegiatan)
-    {
-        Log::info("[DAFTAR_HADIR] Memulai pengambilan data untuk ID Kegiatan: {$idKegiatan}");
-        $kegiatan = null;
-        $jadwalDenganKehadiran = new Collection();
-        try {
-            $kegiatanListResult = $this->apiService->getKegiatanList();
-            if ($kegiatanListResult && !isset($kegiatanListResult['_error']) && is_array($kegiatanListResult)) {
-                $rawKegiatanArray = collect($kegiatanListResult)->first(fn($itemArray) => ((object)$itemArray)->id_kegiatan == $idKegiatan);
-                
-                if (!$rawKegiatanArray) { abort(404, 'Kegiatan tidak ditemukan.');}
-                $kegiatan = (object) $rawKegiatanArray;
+    // app/Http/Controllers/KegiatanController.php
 
-                $allJadwalResult = $this->apiService->getJadwalKegiatanList();
-                if (!$allJadwalResult || isset($allJadwalResult['_error']) || !is_array($allJadwalResult)) { throw new \Exception("Gagal mengambil data jadwal.");}
-                $allJadwal = collect($allJadwalResult)->map(fn($item) => (object) $item);
-                
-                $jadwalUntukKegiatanIni = $allJadwal->filter(fn($jadwal) => ($jadwal->id_kegiatan ?? null) == $idKegiatan)
-                    ->sortBy(function($jadwal) {
-                        $tgl = $jadwal->tgl_kegiatan ?? '1970-01-01 00:00:00';
-                        $waktu = $jadwal->waktu_mulai ?? $tgl;
-                        try { return \Carbon\Carbon::parse($waktu)->timestamp; } catch (\Exception $e) { try { return \Carbon\Carbon::parse($tgl)->timestamp; } catch (\Exception $ex) { return 0;}}
-                    })->values();
+public function daftarHadir(string $idKegiatan)
+{
+    Log::info("[DAFTAR_HADIR] Memulai pengambilan data untuk ID Kegiatan: {$idKegiatan}");
+    $kegiatan = null;
+    $jadwalDenganKehadiran = new Collection();
 
-                $allHadirResult = $this->apiService->getHadirKegiatanList();
-                if (!$allHadirResult || isset($allHadirResult['_error']) || !is_array($allHadirResult)) { throw new \Exception("Gagal mengambil data kehadiran.");}
-                $allHadirKegiatan = collect($allHadirResult)->map(fn($item) => (object) $item);
-
-                $jadwalDenganKehadiran = $jadwalUntukKegiatanIni->map(function ($jadwal) use ($allHadirKegiatan) {
-                    $idJadwalIni = $jadwal->id_jadwal ?? null;
-                    $jadwal->kehadiran = $idJadwalIni ? $allHadirKegiatan->where('id_jadwal', $idJadwalIni)->pluck('nim')->filter()->values() : new Collection();
-                    return $jadwal;
-                });
-
-            } else { abort(500, 'Gagal mengambil data kegiatan.');}
-        } catch (\Exception $e) {
-            Log::error("[DAFTAR_HADIR] Exception saat memproses daftar hadir untuk kegiatan ID {$idKegiatan}: " . $e->getMessage());
-            abort(500, 'Terjadi kesalahan server.');
+    try {
+        // 1. Ambil data kegiatan utama
+        $kegiatanListResult = $this->apiService->getKegiatanList();
+        if (!$kegiatanListResult || isset($kegiatanListResult['_error'])) {
+            // Jika daftar kegiatan utama gagal diambil, ini adalah error fatal.
+            Log::error('[DAFTAR_HADIR] Gagal mengambil daftar kegiatan dari API.', $kegiatanListResult ?? []);
+            abort(500, 'Gagal mengambil data kegiatan dari API.');
         }
-        return view('kegiatan-daftar-hadir', compact('kegiatan', 'jadwalDenganKehadiran'));
+
+        $rawKegiatanArray = collect($kegiatanListResult)->first(function ($itemArray) use ($idKegiatan) {
+            $itemObject = (object)$itemArray;
+            $kegiatanIdApi = $itemObject->id_kegiatan ?? $itemObject->ID_KEGIATAN ?? null;
+            return (string)$kegiatanIdApi === (string)$idKegiatan;
+        });
+
+        if (!$rawKegiatanArray) {
+            abort(404, 'Kegiatan tidak ditemukan.');
+        }
+        $kegiatan = (object) $rawKegiatanArray;
+
+        // 2. Ambil semua jadwal
+        $allJadwalResult = $this->apiService->getJadwalKegiatanList();
+        // **PERBAIKAN:** Cek error secara spesifik, jika tidak ada error, anggap data lain (null, [], dll) sebagai koleksi kosong.
+        if (isset($allJadwalResult['_error'])) {
+            Log::error('[DAFTAR_HADIR] API Error saat mengambil jadwal.', $allJadwalResult);
+            $allJadwal = new Collection(); // Lanjutkan dengan koleksi kosong
+        } else {
+            // Jika isinya bukan array (misal null atau string kosong), buat jadi koleksi kosong.
+            $allJadwal = is_array($allJadwalResult) ? collect($allJadwalResult)->map(fn($item) => (object) $item) : new Collection();
+        }
+
+        // 3. Ambil semua data kehadiran
+        $allHadirResult = $this->apiService->getHadirKegiatanList();
+        // **PERBAIKAN:** Terapkan logika yang sama untuk data kehadiran.
+        if (isset($allHadirResult['_error'])) {
+            Log::error('[DAFTAR_HADIR] API Error saat mengambil data kehadiran.', $allHadirResult);
+            $allHadirKegiatan = new Collection(); // Lanjutkan dengan koleksi kosong
+        } else {
+            $allHadirKegiatan = is_array($allHadirResult) ? collect($allHadirResult)->map(fn($item) => (object) $item) : new Collection();
+        }
+
+        // Filter jadwal untuk kegiatan ini
+        $jadwalUntukKegiatanIni = $allJadwal->filter(function($jadwal) use ($idKegiatan) {
+            $jadwalKegiatanId = $jadwal->id_kegiatan ?? $jadwal->ID_KEGIATAN ?? null;
+            return (string)$jadwalKegiatanId === (string)$idKegiatan;
+        })->sortBy(function($jadwal) {
+            try {
+                return \Carbon\Carbon::parse(($jadwal->tgl_kegiatan ?? '') . ' ' . ($jadwal->waktu_mulai ?? ''))->timestamp;
+            } catch (\Exception $e) {
+                return 0; // Fallback untuk sorting jika tanggal tidak valid
+            }
+        })->values();
+
+        // Gabungkan jadwal dengan data kehadiran
+        $jadwalDenganKehadiran = $jadwalUntukKegiatanIni->map(function ($jadwal) use ($allHadirKegiatan) {
+            $idJadwalIni = $jadwal->id_jadwal ?? $jadwal->ID_JADWAL ?? $jadwal->id ?? null;
+            $jadwal->kehadiran = $idJadwalIni ? $allHadirKegiatan->where('id_jadwal', (string)$idJadwalIni)->pluck('nim')->filter()->values() : new Collection();
+            return $jadwal;
+        });
+
+    } catch (\Exception $e) {
+        Log::error("[DAFTAR_HADIR] Exception saat memproses daftar hadir untuk kegiatan ID {$idKegiatan}: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+        abort(500, 'Terjadi kesalahan server saat memuat data.');
     }
+
+    return view('kegiatan-daftar-hadir', compact('kegiatan', 'jadwalDenganKehadiran'));
+}
+    
 }

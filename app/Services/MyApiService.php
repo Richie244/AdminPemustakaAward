@@ -56,6 +56,7 @@ class MyApiService
             'jadwal-kegiatan'           => 'ID_JADWAL',
             'hadir-kegiatan'            => 'ID_HADIR',
             'aksara-dinamika'           => 'ID_AKSARA_DINAMIKA',
+            'kota'                      => 'id',
             'default'                   => 'id',
         ];
     }
@@ -368,5 +369,12 @@ class MyApiService
     // Civitas
     public function getCivitasList(array $queryParams = []): ?array {
         return $this->handleResponse($this->httpClient->get('civitas', $queryParams),'Gagal mengambil daftar Civitas');
+    }
+
+    public function getKotaList(): ?array
+    {
+        Log::info('[MyApiService] Mengambil daftar kota dari endpoint /kota');
+        $response = $this->httpClient->get('kota'); // Memanggil endpoint /kota
+        return $this->handleResponse($response, 'Gagal mengambil daftar kota');
     }
 }

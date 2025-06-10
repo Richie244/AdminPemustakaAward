@@ -122,21 +122,52 @@ class PerusahaanController extends Controller
     public function create()
     {
         Log::info('[PERUSAHAAN_CREATE] Menampilkan form tambah perusahaan.');
-        return view('tambah-perusahaan');
+        
+        $kotaList = [];
+        $error_message_kota = null;
+
+        try {
+            $responseKota = $this->apiService->getKotaList();
+
+            if ($responseKota && !isset($responseKota['_error']) && isset($responseKota['data'])) {
+                // Konversi data kota menjadi collection object
+                $kotaList = collect($responseKota['data'])->map(fn($item) => (object)$item);
+            } else {
+                $error_message_kota = 'Gagal memuat daftar kota dari API.';
+                Log::error('[PERUSAHAAN_CREATE] Gagal mengambil daftar kota.', $responseKota ?? []);
+            }
+
+        } catch (\Exception $e) {
+            $error_message_kota = 'Terjadi kesalahan sistem saat memuat daftar kota.';
+            Log::error('[PERUSAHAAN_CREATE] Exception saat mengambil daftar kota: ' . $e->getMessage());
+        }
+
+        // Kirimkan $kotaList dan pesan error (jika ada) ke view
+        return view('tambah-perusahaan', [
+            'kotaList' => $kotaList,
+            'error_message_kota' => $error_message_kota
+        ]);
     }
+
+
+    // app/Http/Controllers/PerusahaanController.php
 
     public function store(Request $request)
     {
         Log::info('[PERUSAHAAN_STORE_START] Menerima request untuk menyimpan perusahaan baru.', $request->all());
 
+        // --- AWAL PERBAIKAN ---
+        // Sesuaikan aturan validasi ini agar cocok dengan nama input di form Anda
+        // dan juga apa yang diharapkan oleh API Controller.
         $validator = Validator::make($request->all(), [
-            'nama_perusahaan' => 'required|string|max:100',
-            'alamat_perusahaan' => 'nullable|string|max:255',
-            'kota_perusahaan' => 'nullable|string|max:100', // Bisa ID atau Nama Kota
-            'email_perusahaan' => 'nullable|email|max:100',
-            'telp_perusahaan' => 'nullable|string|max:50',
-            'contact_person_perusahaan' => 'nullable|string|max:100',
+            'nama'   => 'required|string|max:100',
+            'alamat' => 'nullable|string|max:255',
+            'kota'   => 'required|numeric', // API mengharapkan ID kota, jadi validasinya numeric
+            'email'  => 'nullable|email|max:100',
+            'telp'   => 'nullable|string|max:50',
+            'kontak' => 'nullable|string|max:100',
         ]);
+        // --- AKHIR PERBAIKAN ---
 
         if ($validator->fails()) {
             Log::warning('[PERUSAHAAN_STORE_VALIDATION_FAIL]', $validator->errors()->toArray());
@@ -151,23 +182,25 @@ class PerusahaanController extends Controller
             return redirect()->route('master-perusahaan.create')->with('error', 'Gagal generate ID Perusahaan. Periksa koneksi atau log API.')->withInput();
         }
 
+        // Array data yang dikirim ke API sudah benar dari jawaban sebelumnya
         $dataPerusahaan = [
-            'id' => $nextPerusahaanId, // Sesuaikan key dengan API Anda: id, id_perusahaan, atau ID_PERUSAHAAN
-            'nama_perusahaan' => $request->input('nama_perusahaan'),
-            'alamat_perusahaan' => $request->input('alamat_perusahaan'),
-            'kota_perusahaan' => $request->input('kota_perusahaan'),
-            'email_perusahaan' => $request->input('email_perusahaan'),
-            'telp_perusahaan' => $request->input('telp_perusahaan'),
-            'contact_person_perusahaan' => $request->input('contact_person_perusahaan'),
+            'id'     => $nextPerusahaanId,
+            'nama'   => $request->input('nama'),
+            'alamat' => $request->input('alamat'),
+            'kota'   => $request->input('kota'),
+            'email'  => $request->input('email'),
+            'telp'   => $request->input('telp'),
+            'kontak' => $request->input('kontak'),
         ];
 
-        $resultPerusahaan = $this->apiService->createPerusahaanPemateri($dataPerusahaan); // createPerusahaanPemateri mengarah ke endpoint /perusahaan
+        $resultPerusahaan = $this->apiService->createPerusahaanPemateri($dataPerusahaan);
 
-        if ($resultPerusahaan && !isset($resultPerusahaan['_error']) && (!isset($resultPerusahaan['success']) || $resultPerusahaan['success'] === true || isset($resultPerusahaan['_success_no_content']))) {
+        if ($resultPerusahaan && !isset($resultPerusahaan['_error']) && ($resultPerusahaan['success'] ?? false) === true) {
             Log::info('[PERUSAHAAN_STORE_SUCCESS] Perusahaan berhasil disimpan.', ['request_data' => $dataPerusahaan, 'api_response' => $resultPerusahaan]);
             return redirect()->route('master-perusahaan.index')->with('success', 'Perusahaan baru berhasil ditambahkan.');
         } else {
-            $apiErrorMsg = $resultPerusahaan['_json_error_data']['message'] ?? ($resultPerusahaan['message'] ?? ($resultPerusahaan['_body'] ?? 'Error API saat membuat perusahaan.'));
+            $apiErrorMsgArr = $resultPerusahaan['errors'] ?? ($resultPerusahaan['message'] ?? ($resultPerusahaan['_body'] ?? 'Error API saat membuat perusahaan.'));
+            $apiErrorMsg = is_array($apiErrorMsgArr) ? json_encode($apiErrorMsgArr) : $apiErrorMsgArr;
             Log::error('[PERUSAHAAN_STORE_API_FAIL] Gagal menyimpan perusahaan.', ['request_data' => $dataPerusahaan, 'response' => $resultPerusahaan]);
             return redirect()->route('master-perusahaan.create')->with('error', 'Gagal menyimpan perusahaan: ' . $apiErrorMsg)->withInput();
         }

@@ -29,66 +29,80 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {{-- Nama Perusahaan --}}
                 <div class="md:col-span-2">
-                    <label for="nama_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Nama Perusahaan <span class="text-red-500">*</span></label>
-                    <input type="text" name="nama_perusahaan" id="nama_perusahaan" value="{{ old('nama_perusahaan') }}"
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('nama_perusahaan') border-red-500 @enderror"
+                    <label for="nama" class="block text-sm font-medium text-gray-700 mb-1">Nama Perusahaan <span class="text-red-500">*</span></label>
+                    <input type="text" name="nama" id="nama" value="{{ old('nama') }}"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('nama') border-red-500 @enderror"
                            required>
-                    @error('nama_perusahaan')
+                    @error('nama')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 {{-- Alamat Perusahaan --}}
                 <div class="md:col-span-2">
-                    <label for="alamat_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Alamat Perusahaan</label>
-                    <textarea name="alamat_perusahaan" id="alamat_perusahaan" rows="3"
-                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('alamat_perusahaan') border-red-500 @enderror"
-                              >{{ old('alamat_perusahaan') }}</textarea>
-                    @error('alamat_perusahaan')
+                    <label for="alamat" class="block text-sm font-medium text-gray-700 mb-1">Alamat Perusahaan</label>
+                    <textarea name="alamat" id="alamat" rows="3"
+                              class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('alamat') border-red-500 @enderror"
+                              >{{ old('alamat') }}</textarea>
+                    @error('alamat')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
-                {{-- Kota Perusahaan --}}
+                {{-- Kota Perusahaan (Dropdown) --}}
                 <div>
-                    <label for="kota_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Kota Perusahaan</label>
-                    <input type="text" name="kota_perusahaan" id="kota_perusahaan" value="{{ old('kota_perusahaan') }}"
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('kota_perusahaan') border-red-500 @enderror"
-                           placeholder="Contoh: Surabaya atau ID Kota (mis: 1)">
-                    @error('kota_perusahaan')
+                    <label for="kota" class="block text-sm font-medium text-gray-700 mb-1">Kota Perusahaan</label>
+                    <select name="kota" id="kota"
+                            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('kota') border-red-500 @enderror">
+                        <option value="">-- Pilih Kota --</option>
+                        
+                        @if(isset($kotaList) && $kotaList->isNotEmpty())
+                            @foreach($kotaList as $kota)
+                                <option value="{{ $kota->id }}" {{ old('kota') == $kota->id ? 'selected' : '' }}>
+                                    {{ $kota->nama }}
+                                </option>
+                            @endforeach
+                        @else
+                            <option value="" disabled>Gagal memuat daftar kota</option>
+                        @endif
+                    </select>
+                    @if($error_message_kota ?? null)
+                        <p class="mt-1 text-xs text-red-600">{{ $error_message_kota }}</p>
+                    @endif
+                    @error('kota')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 {{-- Email Perusahaan --}}
                 <div>
-                    <label for="email_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Email Perusahaan</label>
-                    <input type="email" name="email_perusahaan" id="email_perusahaan" value="{{ old('email_perusahaan') }}"
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('email_perusahaan') border-red-500 @enderror"
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Perusahaan</label>
+                    <input type="email" name="email" id="email" value="{{ old('email') }}"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('email') border-red-500 @enderror"
                            placeholder="Contoh: info@perusahaan.com">
-                    @error('email_perusahaan')
+                    @error('email')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 {{-- Telepon Perusahaan --}}
                 <div>
-                    <label for="telp_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Telepon Perusahaan</label>
-                    <input type="text" name="telp_perusahaan" id="telp_perusahaan" value="{{ old('telp_perusahaan') }}"
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('telp_perusahaan') border-red-500 @enderror"
+                    <label for="telp" class="block text-sm font-medium text-gray-700 mb-1">Telepon Perusahaan</label>
+                    <input type="text" name="telp" id="telp" value="{{ old('telp') }}"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('telp') border-red-500 @enderror"
                            placeholder="Contoh: 031-xxxxxxx">
-                    @error('telp_perusahaan')
+                    @error('telp')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
 
                 {{-- Contact Person --}}
                 <div>
-                    <label for="contact_person_perusahaan" class="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
-                    <input type="text" name="contact_person_perusahaan" id="contact_person_perusahaan" value="{{ old('contact_person_perusahaan') }}"
-                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('contact_person_perusahaan') border-red-500 @enderror"
+                    <label for="kontak" class="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                    <input type="text" name="kontak" id="kontak" value="{{ old('kontak') }}"
+                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 sm:text-sm @error('kontak') border-red-500 @enderror"
                            placeholder="Contoh: Bpk. Budi">
-                    @error('contact_person_perusahaan')
+                    @error('kontak')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
@@ -112,5 +126,5 @@
 @endsection
 
 @push('scripts')
-{{-- Script tambahan jika ada --}}
+{{-- Script tambahan jika ada, misalnya untuk select2 jika daftar kota banyak --}}
 @endpush
