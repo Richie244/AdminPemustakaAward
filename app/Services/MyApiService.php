@@ -371,7 +371,7 @@ class MyApiService
         return $this->handleResponse($this->httpClient->get('civitas', $queryParams),'Gagal mengambil daftar Civitas');
     }
 
-    public function getKotaList(): ?array
+       public function getKotaList(): ?array
     {
         Log::info('[MyApiService] Mengambil daftar kota dari endpoint /kota');
         $response = $this->httpClient->get('kota'); // Memanggil endpoint /kota

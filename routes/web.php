@@ -41,6 +41,7 @@ Route::resource('sertifikat-templates', SertifikatTemplateController::class)->on
 Route::resource('kegiatan', KegiatanController::class)->parameters([
     'kegiatan' => 'id'
 ]);
+
 Route::get('/kegiatan/{id}/daftar-hadir', [KegiatanController::class, 'daftarHadir'])->name('kegiatan.daftar-hadir');
 Route::get('/report/kegiatan/pdf', [ReportController::class, 'generateKegiatanReportPdf'])->name('report.kegiatan.pdf');
 Route::get('/report/kegiatan/{idKegiatan}/daftar-hadir/pdf', [ReportController::class, 'generateDaftarHadirReportPdf'])->name('report.kegiatan.daftar-hadir.pdf');
