@@ -237,12 +237,26 @@ class MyApiService
     }
 
     // Periode
-    public function getPeriodeList(array $params = []): ?array {
+    public function getPeriodeList(array $params = []): array {
         return $this->handleResponse($this->httpClient->get('periode', $params), 'Gagal mengambil daftar periode');
     }
-    public function createPeriode(array $data): ?array {
+    public function createPeriode(array $data): array {
         return $this->handleResponse($this->httpClient->asJson()->post('periode', $data), 'Gagal membuat periode');
     }
+    public function getPeriodeDetail(string $id): array {
+        return $this->handleResponse($this->httpClient->get("periode/{$id}"), "Gagal mengambil detail periode ID: {$id}");
+    }
+    public function getLatestPeriodeDetails(): array {
+        return $this->handleResponse($this->httpClient->get('periode', ['_sort' => 'start_date:DESC', '_limit' => 1]), 'Gagal mengambil periode terbaru');
+    }
+    public function deletePeriode(string $id): array {
+        return $this->handleResponse($this->httpClient->delete("periode/{$id}"), "Gagal menghapus periode ID: {$id}");
+    }
+
+    public function createRangeSkor(array $data): array {
+        return $this->handleResponse($this->httpClient->asJson()->post('range-skor', $data), 'Gagal membuat range skor');
+    }
+
 
     // Range Kunjungan
     public function getRangeKunjunganList(array $params = []): ?array {

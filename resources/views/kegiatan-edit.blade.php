@@ -7,7 +7,7 @@
     <div class="max-w-4xl mx-auto">
         <div class="mb-6">
             <a href="{{ route('kegiatan.index') }}"
-               class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors duration-150">
+                class="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors duration-150">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
@@ -47,22 +47,26 @@
                 <div>
                     <label for="judul" class="block text-sm font-medium text-gray-700 mb-1">Judul Kegiatan <span class="text-red-500">*</span></label>
                     <input type="text" name="judul" id="judul" value="{{ old('judul', $kegiatan->judul_kegiatan ?? ($kegiatan->JUDUL_KEGIATAN ?? '')) }}"
-                           class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
-                           required>
+                            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
+                            required>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                         <label for="media" class="block text-sm font-medium text-gray-700 mb-1">Media <span class="text-red-500">*</span></label>
-                        <input type="text" name="media" id="media" value="{{ old('media', $kegiatan->media ?? ($kegiatan->MEDIA ?? '')) }}"
-                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
-                               required placeholder="Contoh: Zoom, GMeet, Offline">
+                        <select name="media" id="media"
+                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
+                                required>
+                            <option value="">-- Pilih Media --</option>
+                            <option value="Online" @if(old('media', $kegiatan->media ?? ($kegiatan->MEDIA ?? '')) == 'Online') selected @endif>Online</option>
+                            <option value="Offline" @if(old('media', $kegiatan->media ?? ($kegiatan->MEDIA ?? '')) == 'Offline') selected @endif>Offline</option>
+                        </select>
                     </div>
                     <div class="md:col-span-2">
                         <label for="lokasi" class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
                         <input type="text" name="lokasi" id="lokasi" value="{{ old('lokasi', $kegiatan->lokasi ?? ($kegiatan->LOKASI ?? '')) }}"
-                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
-                               placeholder="Contoh: Ruang Seminar, Gedung A">
+                                class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
+                                placeholder="Contoh: Ruang Seminar, Gedung A, Link Zoom/GMeet">
                     </div>
                 </div>
 
@@ -80,17 +84,17 @@
                 </div>
 
                 <div class="grid grid-cols-1 gap-6">
-                     <div>
-                        <label for="keterangan_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Keterangan Kegiatan</label>
-                        <textarea name="keterangan_kegiatan" id="keterangan_kegiatan" rows="3"
-                                  class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">{{ old('keterangan_kegiatan', $kegiatan->keterangan ?? ($kegiatan->KETERANGAN ?? '')) }}</textarea>
-                    </div>
-                    <div>
-                        <label for="bobot_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Poin SKKP (Bobot) <span class="text-red-500">*</span></label>
-                        <input type="number" name="bobot_kegiatan" id="bobot_kegiatan" value="{{ old('bobot_kegiatan', $kegiatan->jadwal->first()->bobot ?? 0) }}" min="0"
-                               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
-                               required>
-                    </div>
+                        <div>
+                            <label for="keterangan_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Keterangan Kegiatan</label>
+                            <textarea name="keterangan_kegiatan" id="keterangan_kegiatan" rows="3"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">{{ old('keterangan_kegiatan', $kegiatan->keterangan ?? ($kegiatan->KETERANGAN ?? '')) }}</textarea>
+                        </div>
+                        <div>
+                            <label for="bobot_kegiatan" class="block text-sm font-medium text-gray-700 mb-1">Poin Kegiatan Per Sesi <span class="text-red-500">*</span></label>
+                            <input type="number" name="bobot_kegiatan" id="bobot_kegiatan" value="{{ old('bobot_kegiatan', $kegiatan->jadwal->first()->bobot ?? 0) }}" min="0"
+                                    class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm"
+                                    required>
+                        </div>
                 </div>
 
                 <div class="pt-6 border-t border-gray-200">
@@ -113,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const masterPemateriData = @json($masterPemateri ?? collect());
     const sesiContainer = document.getElementById('sesi-container');
     const addSesiBtn = document.querySelector('.add-sesi');
-    let sesiCounter = {{ count(old('sesi', $kegiatan->jadwal ?? [])) }};
+    let sesiCounter = 0; // Reset counter to 0 and let it increment in addSesiField
     const currentSesiData = @json($currentSesiData);
 
     function initSelect2(selector) {
@@ -160,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (masterPemateriData.length === 0) {
-             optionsHtml += '<option value="" disabled>Tidak ada data master pemateri. Harap tambah terlebih dahulu.</option>';
+            optionsHtml += '<option value="" disabled>Tidak ada data master pemateri. Harap tambah terlebih dahulu.</option>';
         }
 
         return `
@@ -178,9 +182,9 @@ document.addEventListener('DOMContentLoaded', function() {
             if (sesiHeader) {
                 sesiHeader.textContent = `Detail Sesi ${index + 1}`;
             }
-             const pemateriLabel = item.querySelector('.pemateri-label');
+            const pemateriLabel = item.querySelector('.pemateri-label');
             if(pemateriLabel) {
-                 pemateriLabel.textContent = `Pemateri Sesi ${index + 1}`;
+                pemateriLabel.textContent = `Pemateri Sesi ${index + 1}`;
             }
         });
     }
@@ -205,17 +209,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div>
                     <label for="sesi_${currentIndex}_tanggal" class="block text-sm font-medium text-gray-700 mb-1">Tanggal <span class="text-red-500">*</span></label>
                     <input type="date" name="sesi[${currentIndex}][tanggal]" id="sesi_${currentIndex}_tanggal" value="${oldTanggal}"
-                           class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm" required>
+                            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm" required>
                 </div>
                 <div>
                     <label for="sesi_${currentIndex}_jam_mulai" class="block text-sm font-medium text-gray-700 mb-1">Jam Mulai <span class="text-red-500">*</span></label>
                     <input type="time" name="sesi[${currentIndex}][jam_mulai]" id="sesi_${currentIndex}_jam_mulai" value="${oldJamMulai}"
-                           class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm" required>
+                            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm" required>
                 </div>
                 <div>
                     <label for="sesi_${currentIndex}_jam_selesai" class="block text-sm font-medium text-gray-700 mb-1">Jam Selesai</label>
                     <input type="time" name="sesi[${currentIndex}][jam_selesai]" id="sesi_${currentIndex}_jam_selesai" value="${oldJamSelesai}"
-                           class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
+                            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 px-3.5 text-sm">
                 </div>
             </div>
             <div class="mt-4">
@@ -242,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addSesiField();
     });
 
-    if (currentSesiData.length > 0) {
+    if (currentSesiData && currentSesiData.length > 0) {
         currentSesiData.forEach(sesiData => addSesiField(sesiData));
     } else {
         addSesiField(); // Tambah satu jika tidak ada data sama sekali
