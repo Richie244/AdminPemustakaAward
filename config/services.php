@@ -46,7 +46,7 @@ return [
     ],
 
         'civitas_api' => [ // Kunci spesifik untuk API Civitas Anda
-        'url' => env('CIVITAS_API_URL', 'https://178b-139-228-46-217.ngrok-free.app/api/civitas'), // Fallback jika .env tidak diset
+        'url' => env('CIVITAS_API_URL'), // Fallback jika .env tidak diset
         'key' => env('CIVITAS_API_KEY', null), // Jika API Anda memerlukan key
     ],
 ];

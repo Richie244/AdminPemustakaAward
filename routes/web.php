@@ -6,6 +6,7 @@ use App\Http\Controllers\SertifikatTemplateController;
 use App\Http\Controllers\SertifikatGeneratorController;
 use App\Http\Controllers\PemateriController;
 use App\Http\Controllers\AksaraController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PeriodeController;
 use App\Http\Controllers\ReportController;
@@ -29,6 +30,8 @@ Route::get('/', function () {
 Route::get('/login', [LoginController::class, 'viewLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'authenticate'])->name('login.authenticate');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 // --- Route Sertifikat Template ---
 Route::resource('sertifikat-templates', SertifikatTemplateController::class)->only([

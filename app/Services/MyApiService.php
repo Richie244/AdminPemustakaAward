@@ -161,7 +161,7 @@ class MyApiService
                 }
                 return null;
             }
-             if (isset($apiResponse['_success_no_content'])) {
+               if (isset($apiResponse['_success_no_content'])) {
                 Log::info("[SERVICE_GET_NEXT_ID] Endpoint '{$endpoint}' returned success with no content. Assuming empty, starting ID from {$defaultId}.");
                 return $defaultId;
             }
@@ -209,7 +209,7 @@ class MyApiService
                             Log::debug("[SERVICE_GET_NEXT_ID] Found ID {$currentId} using key '{$key}' in item " . ($keyItem+1) . " for '{$endpoint}'.");
                             break;
                         } else {
-                             Log::debug("[SERVICE_GET_NEXT_ID] Found key '{$key}' but value '{$value}' is not numeric in item " . ($keyItem+1) . " for '{$endpoint}'.");
+                              Log::debug("[SERVICE_GET_NEXT_ID] Found key '{$key}' but value '{$value}' is not numeric in item " . ($keyItem+1) . " for '{$endpoint}'.");
                         }
                     }
                 }
@@ -385,10 +385,40 @@ class MyApiService
         return $this->handleResponse($this->httpClient->get('civitas', $queryParams),'Gagal mengambil daftar Civitas');
     }
 
-       public function getKotaList(): ?array
+    public function getKotaList(): ?array
     {
         Log::info('[MyApiService] Mengambil daftar kota dari endpoint /kota');
         $response = $this->httpClient->get('kota'); // Memanggil endpoint /kota
         return $this->handleResponse($response, 'Gagal mengambil daftar kota');
     }
+
+    // ========== START: FUNGSI BARU UNTUK LEADERBOARD ==========
+
+    /**
+     * Mengambil data leaderboard untuk mahasiswa.
+     *
+     * @param array $params Query parameters opsional.
+     * @return array|null
+     */
+    public function getMahasiswaLeaderboard(array $params = []): ?array
+    {
+        Log::info('[MyApiService] Mengambil leaderboard mahasiswa dari endpoint /rekap-poin/leaderboard/mhs');
+        $response = $this->httpClient->get('rekap-poin/leaderboard/mhs', $params);
+        return $this->handleResponse($response, 'Gagal mengambil leaderboard mahasiswa');
+    }
+
+    /**
+     * Mengambil data leaderboard untuk dosen.
+     *
+     * @param array $params Query parameters opsional.
+     * @return array|null
+     */
+    public function getDosenLeaderboard(array $params = []): ?array
+    {
+        Log::info('[MyApiService] Mengambil leaderboard dosen dari endpoint /rekap-poin/leaderboard/dosen');
+        $response = $this->httpClient->get('rekap-poin/leaderboard/dosen', $params);
+        return $this->handleResponse($response, 'Gagal mengambil leaderboard dosen');
+    }
+
+    // ========== END: FUNGSI BARU UNTUK LEADERBOARD ==========
 }

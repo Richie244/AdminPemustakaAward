@@ -116,7 +116,7 @@ class LoginController extends Controller
             if ($foundUserFromApi['status'] == 'TENDIK') {
                 // Pastikan route 'periode.index' ada dan sesuai
                 // Sebelumnya 'kegiatan.index', diubah sesuai kode terakhir Anda
-                return redirect()->intended(route('periode.index')); 
+                return redirect()->intended(route('dashboard')); 
             } else {
                 // Pastikan route 'leaderboard2' ada dan sesuai
                 return redirect()->intended(route('leaderboard2'));
