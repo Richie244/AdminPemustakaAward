@@ -138,10 +138,11 @@
                             @foreach($prioritasComponents as $key => $label)
                             <div>
                                 <label for="poin_komponen_{{ $key }}" class="block text-sm font-medium text-gray-600 mb-1">{{ $label }}</label>
-                                <select name="poin_komponen[{{$key}}]" required class="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-3.5 text-sm">
+                                <select name="poin_komponen[{{$key}}]" required class="block w-full rounded-lg border-gray-300 shadow-sm py-2.5 px-3.5 text-sm priority-select">
                                     <option value="">-- Pilih Prioritas --</option>
-                                    @foreach($prioritasOptions as $optionName => $optionValue)
-                                        <option value="{{ $optionName }}" {{ (old('poin_komponen.' . $key, $previousSettings['poin_komponen'][$key] ?? '') == $optionName) ? 'selected' : '' }}>
+                                    @foreach($prioritasOptions as $optionValue => $optionName)
+                                        {{-- PERBAIKAN: Gunakan (string) untuk memastikan perbandingan tipe data yang konsisten --}}
+                                        <option value="{{ $optionValue }}" {{ (string)(old('poin_komponen.' . $key, $previousSettings['poin_komponen'][$key] ?? '')) === (string)$optionValue ? 'selected' : '' }}>
                                             {{ $optionName }}
                                         </option>
                                     @endforeach
@@ -220,6 +221,52 @@
             } else {
                 tambahRange('skor-pinjaman-container', 'pinjaman');
             }
+            
+            // 1. Temukan semua dropdown prioritas
+        const allPrioritySelects = document.querySelectorAll('.priority-select');
+
+        // 2. Buat fungsi untuk memperbarui status opsi
+        function updatePriorityOptions() {
+            // Ambil semua nilai yang sedang dipilih (kecuali yang kosong)
+            const selectedValues = Array.from(allPrioritySelects)
+                .map(select => select.value)
+                .filter(value => value !== ''); // Filter nilai kosong
+
+            // Loop ke setiap dropdown prioritas
+            allPrioritySelects.forEach(select => {
+                const ownSelectedValue = select.value;
+
+                // Loop ke setiap opsi di dalam dropdown
+                select.querySelectorAll('option').forEach(option => {
+                    // Jangan nonaktifkan opsi placeholder "-- Pilih Prioritas --"
+                    if (option.value === '') {
+                        return;
+                    }
+
+                    // Cek apakah nilai opsi ini sudah dipilih di dropdown LAIN
+                    const isSelectedElsewhere = selectedValues.includes(option.value);
+                    
+                    // Nonaktifkan opsi jika nilainya sudah dipilih di dropdown lain,
+                    // KECUALI jika itu adalah nilai yang sedang dipilih di dropdown ini.
+                    // Ini agar opsi yang sedang aktif tidak ikut nonaktif.
+                    if (isSelectedElsewhere && option.value !== ownSelectedValue) {
+                        option.disabled = true;
+                    } else {
+                        option.disabled = false;
+                    }
+                });
+            });
+        }
+
+        // 3. Tambahkan event listener ke setiap dropdown
+        //    Setiap kali pengguna mengubah pilihan, panggil fungsi update.
+        allPrioritySelects.forEach(select => {
+            select.addEventListener('change', updatePriorityOptions);
         });
+
+        // 4. Panggil fungsi ini sekali saat halaman dimuat
+        //    Ini penting agar statusnya benar saat menggunakan "Gunakan Setting Sebelumnya".
+        updatePriorityOptions();
+    });
     </script>
 @endsection

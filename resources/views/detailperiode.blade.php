@@ -51,9 +51,10 @@
             }
         }
 
-        // $allPembobotansForView adalah array [id_jenis_bobot => object{id_jenis_bobot, nama_jenis_bobot, nilai}]
+        // $allPembobotansForView adalah array [id_jenis_bobot => object{...}]
         // yang dikirim dari controller.
 
+        // Data untuk "Skor Default"
         $skorAksaraDinamikaDefault = 'N/A';
         if (isset($allPembobotansForView[8]) && is_object($allPembobotansForView[8])) {
             $skorAksaraDinamikaDefault = $allPembobotansForView[8]->nilai ?? 'N/A';
@@ -62,29 +63,45 @@
         // Data untuk "Poin Maksimum per Komponen" (ID Jenis Bobot 4, 5, 6, 7)
         $poinKomponenUntukTampilan = [];
         $komponenIdsToShow = [4, 5, 6, 7];
-        $iconKeys = [
-            4 => 'kunjungan',
-            5 => 'pinjaman',
-            6 => 'aksara_dinamika',
-            7 => 'kegiatan',
-        ];
-
         if (isset($allPembobotansForView) && is_array($allPembobotansForView)) {
             foreach ($komponenIdsToShow as $idBobot) {
-                $namaKomponen = $namaJenisBobotFromController[$idBobot] ?? 'Komponen Tidak Dikenal'; // Ambil nama dari mapping controller
-                $nilaiKomponen = 'N/A';
-                $iconKeyKomponen = $iconKeys[$idBobot] ?? 'default';
-
-                if (isset($allPembobotansForView[$idBobot]) && is_object($allPembobotansForView[$idBobot])) {
-                    $nilaiKomponen = $allPembobotansForView[$idBobot]->nilai ?? 'N/A';
-                }
                 $poinKomponenUntukTampilan[$idBobot] = [
-                    'nama' => $namaKomponen,
-                    'nilai' => $nilaiKomponen,
-                    'icon_key' => $iconKeyKomponen,
+                    'nama' => $namaJenisBobotFromController[$idBobot] ?? 'Komponen Tidak Dikenal',
+                    'nilai' => $allPembobotansForView[$idBobot]->nilai ?? 'N/A',
                 ];
             }
         }
+
+
+        // ### START PENAMBAHAN LOGIKA UNTUK BOBOT PRIORITAS ###
+
+        // Buat mapping untuk mengubah angka (1,2,3,4) menjadi teks
+        $prioritasMapping = [
+            1 => 'Prioritas',
+            2 => 'Penting',
+            3 => 'Menengah',
+            4 => 'Tambahan',
+        ];
+
+        // Siapkan data Bobot Prioritas untuk ditampilkan
+        $bobotPrioritasUntukTampilan = [];
+        // Tentukan ID bobot prioritas yang ingin ditampilkan
+        $prioritasIdsToShow = [11, 12, 10, 9]; // Urutan: Kunjungan, Pinjaman, Kegiatan, Aksara Dinamika
+
+        if (isset($allPembobotansForView) && is_array($allPembobotansForView)) {
+            foreach ($prioritasIdsToShow as $idBobot) {
+                $namaPrioritas = $namaJenisBobotFromController[$idBobot] ?? 'Prioritas Tidak Dikenal';
+                $nilaiNumerik = $allPembobotansForView[$idBobot]->nilai ?? null;
+                // Ubah nilai numerik menjadi teks menggunakan mapping, jika tidak ada, tampilkan 'N/A'
+                $nilaiTeks = $nilaiNumerik ? ($prioritasMapping[$nilaiNumerik] ?? 'N/A') : 'N/A';
+
+                $bobotPrioritasUntukTampilan[$idBobot] = [
+                    'nama' => $namaPrioritas,
+                    'nilai' => $nilaiTeks,
+                ];
+            }
+        }
+        // ### END PENAMBAHAN LOGIKA ###
 
     @endphp
 
@@ -145,10 +162,9 @@
                     </div>
                 </div>
 
-                {{-- ### START PERUBAHAN TATA LETAK GRID SESUAI PERMINTAAN SIMETRIS ### --}}
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                    {{-- 1. Detail Skor Range Kunjungan Harian (Posisi: Kiri Atas) --}}
+                    {{-- 1. Detail Skor Range Kunjungan Harian --}}
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <div class="flex items-center text-gray-700 mb-4">
                             <svg class="w-6 h-6 mr-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7.014A8.003 8.003 0 0122 12c0 3.771-2.502 6.94-6.014 7.753A8.003 8.003 0 0012 22a8.003 8.003 0 00-5.986-2.247C3.502 18.94 1 15.771 1 12c0-1.604.468-3.112 1.258-4.427m2.828 11.084A8 8 0 0117.657 5.343M6.343 18.657A8 8 0 015.343 6.343"></path></svg>
@@ -167,7 +183,7 @@
                         </ul>
                     </div>
                 
-                    {{-- 2. Detail Skor Peminjaman Buku (Posisi: Kanan Atas) --}}
+                    {{-- 2. Detail Skor Peminjaman Buku --}}
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <div class="flex items-center text-gray-700 mb-4">
                             <svg class="w-6 h-6 mr-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v11.494m0 0A7.5 7.5 0 0019.5 12H4.5a7.5 7.5 0 007.5 5.747z"></path></svg>
@@ -186,7 +202,7 @@
                         </ul>
                     </div>
                 
-                    {{-- 3. Level Reward (Posisi: Kiri Tengah) --}}
+                    {{-- 3. Level Reward --}}
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <div class="flex items-center text-gray-700 mb-4">
                             <svg class="w-6 h-6 mr-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -218,7 +234,7 @@
                         </ul>
                     </div>
                 
-                    {{-- 4. Poin Maksimum per Komponen (Posisi: Kanan Tengah) --}}
+                    {{-- 4. Poin Maksimum per Komponen --}}
                     <div class="bg-white p-6 rounded-xl shadow-lg">
                         <div class="flex items-center text-gray-700 mb-4">
                             <svg class="w-6 h-6 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
@@ -227,7 +243,7 @@
                         <ul class="space-y-2">
                             @forelse ($poinKomponenUntukTampilan as $komponen)
                                 <li class="flex justify-between items-center bg-purple-50 p-3 rounded-md hover:bg-purple-100 transition-colors">
-                                    <span class="text-sm text-gray-700 truncate" title="{{ $komponen['nama'] }}">{{ Str::limit($komponen['nama'], 35) }}</span>
+                                    <span class="text-sm text-gray-700 truncate" title="{{ $komponen['nama'] }}">{{ \Illuminate\Support\Str::limit($komponen['nama'], 35) }}</span>
                                     <span class="text-sm font-semibold text-purple-700 ml-2 flex-shrink-0">{{ $komponen['nilai'] }} poin</span>
                                 </li>
                             @empty
@@ -236,11 +252,34 @@
                         </ul>
                     </div>
 
-                    {{-- 5. Skor Default (Posisi: Bawah Tengah, Simetris) --}}
+                    {{-- ### START KARTU BARU UNTUK BOBOT PRIORITAS ### --}}
+                    {{-- Dibuat lg:col-span-2 agar memenuhi lebar grid dan menjaga simetri --}}
+                    <div class="bg-white p-6 rounded-xl shadow-lg lg:col-span-2">
+                        <div class="flex items-center text-gray-700 mb-4">
+                            <svg class="w-6 h-6 mr-3 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M4 4h16v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm5 8h6m-3-3v6"></path></svg>
+                            <h2 class="text-xl font-semibold">Bobot Prioritas Komponen</h2>
+                        </div>
+                        {{-- Menggunakan grid internal agar 4 item bisa sejajar rapi --}}
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            @forelse ($bobotPrioritasUntukTampilan as $prioritas)
+                                <div class="bg-cyan-50 p-4 rounded-lg text-center hover:bg-cyan-100 transition-colors">
+                                    <p class="text-sm text-cyan-800 font-medium truncate" title="{{ $prioritas['nama'] }}">{{ $prioritas['nama'] }}</p>
+                                    <p class="text-xl font-bold text-cyan-600">{{ $prioritas['nilai'] }}</p>
+                                </div>
+                            @empty
+                                <div class="col-span-full text-sm text-gray-500 text-center py-4">
+                                    Belum ada bobot prioritas yang ditentukan.
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+                    {{-- ### END KARTU BARU ### --}}
+
+                    {{-- Skor Default (diletakkan di bawah agar tetap simetris di tengah) --}}
                     <div class="lg:col-span-2 flex justify-center">
                         <div class="bg-white p-6 rounded-xl shadow-lg w-full lg:w-1/2">
-                            <h2 class="text-xl font-semibold text-gray-700 mb-2">Skor Default</h2>
-                            <div class="bg-blue-50 p-4 rounded-lg">
+                            <h2 class="text-xl font-semibold text-gray-700 mb-2 text-center">Skor Default</h2>
+                            <div class="bg-blue-50 p-4 rounded-lg text-center">
                                 <p class="text-sm text-blue-700">{{ $namaJenisBobotFromController[8] ?? 'Aksara Dinamika (Review Buku)' }}</p>
                                 <p class="text-3xl font-bold text-blue-600">{{ $skorAksaraDinamikaDefault }} <span class="text-lg font-normal">poin</span></p>
                             </div>
@@ -248,7 +287,6 @@
                     </div>
 
                 </div>
-                 {{-- ### END PERUBAHAN TATA LETAK GRID ### --}}
 
             @elseif(!$error)
                 <div class="text-center bg-white p-10 rounded-xl shadow-lg">
