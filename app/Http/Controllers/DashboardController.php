@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use App\Services\MyApiService;
-use Illuminate\Support\Facades\Log; // Menggunakan API Service Anda
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
+    /**
+     * @var \App\Services\MyApiService
+     */
     protected $apiService;
 
     public function __construct(MyApiService $apiService)
@@ -17,21 +19,36 @@ class DashboardController extends Controller
     }
 
     /**
-     * Menampilkan halaman dashboard dengan data leaderboard.
+     * Menampilkan halaman dashboard dengan data leaderboard yang bisa difilter.
      *
+     * @param \Illuminate\Http\Request $request
      * @return \Illuminate\View\View
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Menggunakan method yang sudah ada di MyApiService
-        $dataMhs = $this->apiService->getMahasiswaLeaderboard();
-        $dataDosen = $this->apiService->getDosenLeaderboard();
+        // Ambil periode_id dari query string
+        $periodeId = $request->query('periode');
+        $queryParams = $periodeId ? ['periode' => $periodeId] : [];
 
-        // Mengambil 5 data teratas, dengan penanganan jika data tidak ada atau error
-        $top5Mhs = (!isset($dataMhs['_error']) && is_array($dataMhs)) ? array_slice($dataMhs, 0, 5) : [];
-        $top5Dosen = (!isset($dataDosen['_error']) && is_array($dataDosen)) ? array_slice($dataDosen, 0, 5) : [];
+        // Panggil API dengan parameter periode
+        $dataMhs = $this->apiService->getMahasiswaLeaderboard($queryParams);
+        $dataDosen = $this->apiService->getDosenLeaderboard($queryParams);
 
-        // Menampilkan pesan error jika salah satu API gagal
+        // PERBAIKAN: Mem-parsing struktur response API yang baru
+        $top5Mhs = [];
+        if (isset($dataMhs['leaderboard']) && is_array($dataMhs['leaderboard'])) {
+            $top5Mhs = array_slice($dataMhs['leaderboard'], 0, 5);
+        }
+
+        $top5Dosen = [];
+        if (isset($dataDosen['leaderboard']) && is_array($dataDosen['leaderboard'])) {
+            $top5Dosen = array_slice($dataDosen['leaderboard'], 0, 5);
+        }
+
+        // Ambil nama periode aktif dari salah satu response
+        $selectedPeriodeName = $dataMhs['periode_aktif'] ?? 'Periode Saat Ini';
+
+        // Catat error jika ada
         if (isset($dataMhs['_error'])) {
             Log::error('Gagal mengambil leaderboard mahasiswa', $dataMhs);
             session()->flash('error', 'Gagal mengambil data Leaderboard Mahasiswa dari API.');
@@ -41,10 +58,11 @@ class DashboardController extends Controller
             session()->flash('error', 'Gagal mengambil data Leaderboard Dosen dari API.');
         }
         
-        // Kirim data ke view dashboard
+        // Kirim semua data yang diperlukan ke view
         return view('dashboard', [
             'top5Mahasiswa' => $top5Mhs,
-            'top5Dosen' => $top5Dosen
+            'top5Dosen' => $top5Dosen,
+            'selectedPeriodeName' => $selectedPeriodeName,
         ]);
     }
 }

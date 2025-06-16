@@ -169,6 +169,14 @@
     <script>
         function tambahRange(containerId, prefix, data = {start: '', end: '', skor: ''}) {
             const container = document.getElementById(containerId);
+
+            // --- TAMBAHKAN KODE INI ---
+            if (container.childElementCount >= 10) {
+                alert('Maksimal 10 range skor yang dapat ditambahkan.');
+                return;
+            }
+            // --- BATAS KODE TAMBAHAN ---
+
             const div = document.createElement('div');
             div.className = "flex items-center gap-3 range-item";
 

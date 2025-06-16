@@ -93,10 +93,10 @@
                                 }
                             }
                         @endphp
-                        <tr class="{{ $index % 2 == 0 ? 'bg-gray-100' : 'bg-white' }}">
+                        <tr class="{{ (int)$index % 2 == 0 ? 'bg-gray-100' : 'bg-white' }}">
                             <td class="px-2 py-3">
                                 <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[rgba(251,195,77,1)] text-[rgba(31,76,109,1)] font-medium border border-gray-300 text-sm font-rubik">
-                                    {{ $index + 1 }}
+                                    {{ (int)$index + 1 }}
                                 </span>
                             </td>
                             <td class="px-2 py-3">

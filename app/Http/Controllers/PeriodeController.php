@@ -174,7 +174,6 @@ class PeriodeController extends Controller
             Log::error('[PERIODE_INDEX] Exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             $error = 'Terjadi kesalahan saat memuat data periode: ' . $e->getMessage();
         }
-
         return view('periode', ['periodes' => $paginatedPeriodes, 'error' => $error, 'searchTerm' => $searchTerm, 'sortBy' => $sortBy]);
     }
 
@@ -451,6 +450,8 @@ class PeriodeController extends Controller
             'nama_periode' => 'required|string|max:100',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
+            'kunjungan_start' => 'nullable|array|max:10',
+            'pinjaman_start' => 'nullable|array|max:10',
             'kunjungan_start.*' => 'required_with:kunjungan_end.*,kunjungan_skor.*|nullable|numeric|min:0',
             'kunjungan_end.*' => 'required_with:kunjungan_start.*,kunjungan_skor.*|nullable|numeric|gte:kunjungan_start.*',
             'kunjungan_skor.*' => 'required_with:kunjungan_start.*,kunjungan_end.*|nullable|numeric|min:0',
@@ -749,4 +750,16 @@ class PeriodeController extends Controller
         ]);
     }
 
+    public function dropdown()
+    {
+        $response = $this->apiService->getPeriodeList();
+
+        if (isset($response['_error'])) {
+            // Jika terjadi error saat mengambil data dari API, kirim response error
+            return response()->json(['error' => 'Gagal mengambil data periode dari API.'], 500);
+        }
+
+        // Jika berhasil, kirim data periode sebagai JSON
+        return response()->json($response);
+    }
 }

@@ -66,7 +66,9 @@ Route::delete('/perusahaan/{perusahaan}', [PerusahaanController::class, 'destroy
 Route::get('/periode', [App\Http\Controllers\PeriodeController::class, 'index'])->name('periode.index');
 Route::get('/periode/create', [App\Http\Controllers\PeriodeController::class, 'create'])->name('periode.create');
 Route::post('/periode', [App\Http\Controllers\PeriodeController::class, 'store'])->name('periode.store');
+Route::get('/periode/dropdown', [PeriodeController::class, 'dropdown'])->name('periode.dropdown');
 Route::get('/periode/{id}', [App\Http\Controllers\PeriodeController::class, 'show'])->name('periode.show');
+
 
 // --- Route Aksara (Validasi) ---
 Route::prefix('validasi-aksara')->name('validasi.aksara.')->group(function () {
@@ -78,5 +80,6 @@ Route::prefix('validasi-aksara')->name('validasi.aksara.')->group(function () {
 });
 
 // --- Route Generate Sertifikat ---
+
 Route::get('/sertifikat/generate/kegiatan/{idKegiatan}/peserta/{nim}/{peran?}', [SertifikatGeneratorController::class, 'generateUntukKegiatanSatu'])
     ->name('sertifikat.generate.peserta');

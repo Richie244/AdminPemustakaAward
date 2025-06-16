@@ -147,56 +147,60 @@
 @endsection
 
 @push('scripts')
-{{-- REVISI SCRIPT: Integrasi Select2 dengan Alpine.js --}}
+{{-- REVISI SCRIPT KEDUA: Logika Alpine.js yang lebih stabil --}}
 <script>
 document.addEventListener('alpine:init', () => {
     Alpine.data('pemateriForm', () => ({
-        // Default pemateriType diset berdasarkan nilai old() atau default ke 'eksternal'
-        pemateriType: '{{ old('id_perusahaan') == 1 ? 'internal' : (old('id_perusahaan') ? 'eksternal' : 'eksternal') }}',
+        // 1. Tentukan nilai awal berdasarkan old input dari Laravel
+        pemateriType: '{{ old('id_perusahaan') == 1 ? 'internal' : 'eksternal' }}',
         civitasList: {!! $civitasList->keyBy('id_civitas')->toJson() !!},
         selectedCivitasId: '{{ old('id_civitas') }}',
         email: '{{ old('email_pemateri') }}',
         no_hp: '{{ old('no_hp_pemateri') }}',
-        
+
         init() {
-            // Simpan konteks `this` dari Alpine
             let self = this;
 
-            // Inisialisasi Select2 untuk dropdown perusahaan
+            // 2. Inisialisasi Select2 untuk dropdown perusahaan
             $('#id_perusahaan').select2({
                 placeholder: "-- Cari dan Pilih Perusahaan --",
                 allowClear: true
             }).on('select2:select', function(e) {
-                // Ketika pilihan dibuat, panggil method Alpine
+                // Saat pengguna memilih perusahaan BARU, update tipe dan reset field
                 self.updatePemateriType(e.params.data.id);
             }).on('select2:unselect', function(e) {
-                // Ketika pilihan dihapus (clear), set ke eksternal
-                self.updatePemateriType('');
+                // Saat pengguna menghapus pilihan, kembali ke 'eksternal' dan reset field
+                self.updatePemateriType(''); // ID kosong akan dianggap eksternal
             });
 
-            // Inisialisasi Select2 untuk dropdown staf internal
+            // 3. Inisialisasi Select2 untuk dropdown staf internal
             $('#id_civitas_select2').select2({
                 placeholder: "-- Cari Nama Dosen/Staf --",
                 allowClear: true
             }).on('select2:select', function(e) {
-                // Ketika nama dipilih, panggil method Alpine
+                // Saat nama dipilih, hanya perbarui data kontak
                 self.handleCivitasChange(e.params.data.id);
             }).on('select2:unselect', function(e) {
-                 self.resetFields();
+                 // Saat nama dihapus, hanya reset data kontak
+                 self.email = '';
+                 self.no_hp = '';
+                 self.selectedCivitasId = '';
             });
-
-            // Jika ada nilai lama (dari validasi gagal), trigger pembaruan awal
-            const initialCompany = $('#id_perusahaan').val();
-            if (initialCompany) {
-                this.updatePemateriType(initialCompany);
+            
+            // 4. Perbarui data kontak jika ada data lama (saat validasi gagal)
+            if(self.selectedCivitasId && self.pemateriType === 'internal') {
+                self.handleCivitasChange(self.selectedCivitasId);
             }
         },
 
+        // Fungsi untuk mengubah tipe pemateri (dan reset field)
         updatePemateriType(companyId) {
             this.pemateriType = (companyId == '1') ? 'internal' : 'eksternal';
-            this.resetFields();
+            // Panggil reset HANYA saat tipe berubah secara aktif oleh pengguna
+            this.resetFieldsForNewSelection();
         },
 
+        // Fungsi untuk memperbarui email & no.hp berdasarkan pilihan civitas
         handleCivitasChange(civitasId) {
             this.selectedCivitasId = civitasId;
             if (civitasId && this.civitasList[civitasId]) {
@@ -204,16 +208,24 @@ document.addEventListener('alpine:init', () => {
                 this.email = civitas.email || '';
                 this.no_hp = civitas.hp || '';
             } else {
-                this.resetFields();
+                this.email = '';
+                this.no_hp = '';
             }
         },
 
-        resetFields() {
-            // Ketika tipe berubah, reset field yang relevan
-            if (this.pemateriType !== 'internal') {
-                $('#id_civitas_select2').val(null).trigger('change');
-                this.selectedCivitasId = '';
+        // Fungsi untuk mereset field saat pilihan PERUSAHAAN diubah
+        resetFieldsForNewSelection() {
+            // Reset pilihan nama civitas
+            $('#id_civitas_select2').val(null).trigger('change');
+            this.selectedCivitasId = '';
+            
+            // Reset nama pemateri eksternal
+            const namaEksternalInput = document.getElementById('nama_pemateri_eksternal');
+            if (namaEksternalInput) {
+                namaEksternalInput.value = '';
             }
+            
+            // Reset kontak
             this.email = '';
             this.no_hp = '';
         }
