@@ -287,4 +287,88 @@ class ReportController extends Controller
             return response("Error saat generate PDF: " . $e->getMessage(), 500);
         }
     }
+
+    public function generatePdfLeaderboard(Request $request)
+    {
+        $periodeId = $request->query('periode');
+        $queryParams = $periodeId ? ['periode' => $periodeId] : [];
+
+        // Panggil API untuk mendapatkan data leaderboard lengkap
+        // Kita asumsikan response dari API ini sudah berisi info klaim (misal: 'tgl_terima')
+        $dataMhs = $this->apiService->getMahasiswaLeaderboard($queryParams);
+        $dataDosen = $this->apiService->getDosenLeaderboard($queryParams);
+        $periodes = $this->apiService->getPeriodeList();
+
+        $leaderboardMhs = $dataMhs['leaderboard'] ?? [];
+        $leaderboardDosen = $dataDosen['leaderboard'] ?? [];
+        
+        // Logika untuk menentukan nama periode
+        $selectedPeriodeName = 'Periode Saat Ini';
+        if ($periodeId && isset($periodes['data'])) {
+            foreach ($periodes['data'] as $periode) {
+                if ($periode['id_periode'] == $periodeId) {
+                    $selectedPeriodeName = $periode['nama_periode'];
+                    break;
+                }
+            }
+        } elseif (isset($dataMhs['periode_aktif'])) {
+            $selectedPeriodeName = $dataMhs['periode_aktif'];
+        }
+
+        $data = [
+            'leaderboardMahasiswa' => $leaderboardMhs,
+            'leaderboardDosen' => $leaderboardDosen,
+            'namaPeriode' => $selectedPeriodeName,
+            'tanggalCetak' => now()->translatedFormat('d F Y')
+        ];
+
+        $pdf = PDF::loadView('reports.leaderboard_pdf', $data);
+        return $pdf->stream('laporan-leaderboard-'.$selectedPeriodeName.'.pdf');
+    }
+
+    public function generatePdfPenerimaReward(Request $request)
+    {
+        try {
+            // 1. Ambil periodeId dari request
+            $periodeId = $request->query('periode');
+
+            // 2. Teruskan periodeId ke service untuk memfilter data di API
+            $penerimaData = $this->apiService->getPenerimaReward($periodeId);
+            $allWinners = $penerimaData['data'] ?? [];
+            
+            $groupedByLevel = (new Collection($allWinners))->groupBy('level_reward')->sortKeys();
+
+            // 3. Logika untuk menampilkan nama periode di judul PDF
+            $periodes = $this->apiService->getPeriodeList();
+            $namaPeriode = 'Periode Berjalan';
+            $rentangTanggalPeriode = '';
+
+            if ($periodeId && !empty($periodes['data'])) {
+                $selectedPeriode = collect($periodes['data'])->firstWhere('id_periode', $periodeId);
+                if ($selectedPeriode) {
+                    $namaPeriode = $selectedPeriode['nama_periode'];
+                    $rentangTanggalPeriode = \Carbon\Carbon::parse($selectedPeriode['tgl_mulai'])->translatedFormat('d M Y') . ' - ' . \Carbon\Carbon::parse($selectedPeriode['tgl_selesai'])->translatedFormat('d M Y');
+                }
+            } else if (!empty($periodes['data'])) {
+                $currentPeriode = collect($periodes['data'])->firstWhere('status', 'aktif');
+                if ($currentPeriode) {
+                     $namaPeriode = $currentPeriode['nama_periode'];
+                     $rentangTanggalPeriode = \Carbon\Carbon::parse($currentPeriode['tgl_mulai'])->translatedFormat('d M Y') . ' - ' . \Carbon\Carbon::parse($currentPeriode['tgl_selesai'])->translatedFormat('d M Y');
+                }
+            }
+
+            $data = [
+                'groupedWinners' => $groupedByLevel,
+                'namaPeriode' => $namaPeriode,
+                'rentangTanggalPeriode' => $rentangTanggalPeriode
+            ];
+
+            $pdf = PDF::loadView('reports.penerima_reward_visual_pdf', $data);
+            return $pdf->setPaper('a4', 'portrait')->stream('laporan-klaim-hadiah.pdf');
+
+        } catch (\Exception $e) {
+            Log::error('Gagal membuat PDF Laporan Reward: ' . $e->getMessage());
+            return response("Terjadi kesalahan saat membuat laporan PDF.", 500);
+        }
+    }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\SertifikatGeneratorController;
 use App\Http\Controllers\PemateriController;
 use App\Http\Controllers\AksaraController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LeaderboardReportController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\PeriodeController;
 use App\Http\Controllers\ReportController;
@@ -80,6 +81,10 @@ Route::prefix('validasi-aksara')->name('validasi.aksara.')->group(function () {
 });
 
 // --- Route Generate Sertifikat ---
+Route::get('/report/leaderboard/pdf', [ReportController::class, 'generatePdfLeaderboard'])->name('report.leaderboard.pdf');
+Route::get('/report/leaderboard', [LeaderboardReportController::class, 'index'])->name('report.leaderboard');
+Route::get('/report/penerima-reward/pdf', [ReportController::class, 'generatePdfPenerimaReward'])->name('report.penerima-reward.pdf');
+Route::post('/report/leaderboard/claim/{rekapPoinId}', [LeaderboardReportController::class, 'markAsClaimed'])->name('report.leaderboard.claim');
 
 Route::get('/sertifikat/generate/kegiatan/{idKegiatan}/peserta/{nim}/{peran?}', [SertifikatGeneratorController::class, 'generateUntukKegiatanSatu'])
     ->name('sertifikat.generate.peserta');

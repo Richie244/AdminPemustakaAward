@@ -421,4 +421,50 @@ class MyApiService
     }
 
     // ========== END: FUNGSI BARU UNTUK LEADERBOARD ==========
+
+    public function markRewardAsClaimed(string $rekapPoinId): ?array
+    {
+        // Sesuaikan nama endpoint jika berbeda
+        $endpoint = "rekap-poin/klaim/{$rekapPoinId}";
+        Log::info("[MyApiService] Menandai klaim hadiah untuk ID: {$rekapPoinId} melalui endpoint: {$endpoint}");
+        
+        // Menggunakan metode POST sesuai rencana
+        $response = $this->httpClient->post($endpoint);
+        
+        return $this->handleResponse($response, "Gagal menandai klaim hadiah untuk ID: {$rekapPoinId}");
+    }
+
+    public function getPenerimaReward(?string $periodeId = null): ?array
+    {
+        $endpoint = 'penerima-reward';
+        $queryParams = [];
+
+        // Jika ada periodeId, tambahkan sebagai parameter query
+        if ($periodeId) {
+            $queryParams['id_periode'] = $periodeId;
+        }
+
+        Log::info('[MyApiService] Mengambil data dari endpoint: ' . $endpoint, $queryParams);
+        $response = $this->httpClient->get($endpoint, $queryParams);
+        
+        return $this->handleResponse($response, 'Gagal mengambil data penerima reward.');
+    }
+
+    public function getCivitasDetail(string $id_civitas): ?array
+    {
+        // ASUMSI NAMA ENDPOINT. Anda harus mengganti 'civitas' dengan endpoint yang benar.
+        $endpoint = 'civitas/' . $id_civitas;
+        Log::info('[MyApiService] Mengambil detail dari endpoint: ' . $endpoint);
+        $response = $this->httpClient->get($endpoint);
+        return $this->handleResponse($response, 'Gagal mengambil detail civitas ' . $id_civitas);
+    }
+
+    public function getRewardDetail(string $id_reward): ?array
+    {
+        // ASUMSI NAMA ENDPOINT. Anda harus mengganti 'reward-award' dengan endpoint yang benar.
+        $endpoint = 'reward-award/' . $id_reward;
+        Log::info('[MyApiService] Mengambil detail dari endpoint: ' . $endpoint);
+        $response = $this->httpClient->get($endpoint);
+        return $this->handleResponse($response, 'Gagal mengambil detail reward ' . $id_reward);
+    }
 }
